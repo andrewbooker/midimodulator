@@ -6,11 +6,13 @@ use std::{
 
 fn output_from(start: Instant) {
     let freq = 0.8;
+    let max_val: f32 = 40 as f32;
+    let min_val: f32 = -50 as f32;
 
     let dt = start.elapsed().as_millis() as f32;
-    let ang_freq =  freq * 2.0 * f32::consts::PI as f32;
+    let ang_freq = freq * 2.0 * f32::consts::PI as f32;
 
-    println!("{} {}", dt, (dt * 0.001 * ang_freq).cos());
+    println!("{} {}", dt, min_val + ((max_val - min_val) * 0.5 * (1.0 + (dt * 0.001 * ang_freq).cos())));
 }
 
 fn main() {
@@ -20,5 +22,4 @@ fn main() {
         output_from(start);
         thread::sleep(Duration::from_millis(100));
     }
-
 }
