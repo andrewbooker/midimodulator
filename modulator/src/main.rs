@@ -1,3 +1,5 @@
+extern crate portmidi as midi;
+
 use std::{
     f32,
     thread,
@@ -35,6 +37,49 @@ impl ModulationProfile {
     }
 }
 
+
+fn print_devices(pm: &midi::PortMidi) {
+    for device in pm.devices().unwrap() {
+        println!("{}", device);
+    }
+}
+
+
+use midi::MidiMessage;
+fn test_midi(mut out_port: midi::OutputPort) {
+    let channel: u8 = 0;
+    let melody: [(u8, u32); 7] = [
+        (60, 1),
+        (60, 2),
+        (67, 1),
+        (67, 2),
+        (69, 1),
+        (69, 2),
+        (67, 3)
+    ];
+
+    for &(note, dur) in melody.iter() {
+        let note_on = MidiMessage {
+            status: 0x90 + channel,
+            data1: note,
+            data2: 100,
+            data3: 0
+        };
+        println!("{}", note_on);
+        out_port.write_message(note_on);
+        thread::sleep(Duration::from_millis(dur as u64 * 400));
+
+        let note_off = MidiMessage {
+            status: 0x80 + channel,
+            data1: note,
+            data2: 0,
+            data3: 0
+        };
+        println!("{}", note_off);
+        out_port.write_message(note_off);
+    }
+}
+
 fn main() {
     let start = Instant::now();
     let mut mp = ModulationProfile::new(0.05, -50, 40);
@@ -44,4 +89,9 @@ fn main() {
         println!("{} {} {}", i, mp.current_val, mp.previous_val);
         thread::sleep(Duration::from_millis(100));
     }
+    let context = midi::PortMidi::new().unwrap();
+    let device = context.device(2).unwrap();
+    let out_device = context.output_port(device, 1024).unwrap();
+
+    test_midi(out_device);
 }
