@@ -112,14 +112,14 @@ fn to_string(s: *const c_char) -> String {
 }
 
 
-struct KorgSysEx {
+struct KorgProgramSysEx {
     pos: usize,
     data: [u8; 196 + 6]
 }
 
-impl KorgSysEx {
-    fn new() -> KorgSysEx {
-        let mut s = KorgSysEx {
+impl KorgProgramSysEx {
+    fn new() -> KorgProgramSysEx {
+        let mut s = KorgProgramSysEx {
             pos: 1,
             data: [0; 196 + 6]
         };
@@ -132,20 +132,42 @@ impl KorgSysEx {
         s
     }
 
-    fn add_data(&mut self, d: u8) {
+    fn data(&mut self, d: u8) -> &mut KorgProgramSysEx {
         self.data[self.pos + 5] = 0x7F & d;
         let shift: usize = 7 - (self.pos - 1) % 8;
         let block_idx: usize = 8 * (self.pos / 8);
         let carry: u8 = (d & 0x80) >> shift;
         self.data[block_idx + 5] |= carry;
         self.pos += if shift == 1 { 2 } else { 1 };
+        self
     }
 
-    fn add_name(&mut self, n: &str) {
-        for c in n.as_bytes() {
-            self.add_data(c.to_ascii_lowercase());
-        }
+    fn data_double_byte(&mut self, d: u16) -> &mut KorgProgramSysEx {
+        self.data(d as u8);
+        self.data((d >> 8) as u8);
+        self
     }
+
+    fn name(&mut self, n: &str) -> &mut KorgProgramSysEx {
+        for c in n.chars() {
+            self.data(c as u8);
+        }
+        self
+    }
+}
+
+
+fn build_prog_sys_ex(psx: &mut KorgProgramSysEx) {
+    psx
+        .name("2021-01-03")
+        .data(1) // osc: double
+        .data(0) // bit0: poly/mono, bit1: hold off/on
+        .data_double_byte(12) // osc1
+        .data(0) // octave1: -2 ... 1 = 32,16,8,4
+        .data_double_byte(13) // osc2
+        .data(0) // octave2
+        .data(0) // interval
+    ;
 }
 
 
@@ -179,8 +201,8 @@ fn main() {
     println!("prog change {:x} gave {}", prog28.as_u32(), res_prog28 as i32);
     thread::sleep(Duration::from_millis(1000));
 
-    let mut ks = KorgSysEx::new();
-    ks.add_name("2021-01-01");
+    let mut ks = KorgProgramSysEx::new();
+    build_prog_sys_ex(&mut ks);
     let sysex_res = unsafe { Pm_WriteSysEx(ostream, 0, ks.data.as_ptr()) };
     println!("sys_ex: {}", sysex_res as i32);
     println!("{:?}", ks.data);
