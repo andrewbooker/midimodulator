@@ -4,9 +4,9 @@ use std::{
     f32,
     thread,
     time::{Duration, Instant},
-    os::raw::{c_char, c_int, c_uint, c_void},
+    os::raw::{c_char, c_uchar, c_int, c_uint, c_void},
     ptr,
-    ffi::CStr
+    ffi::{CStr}
 };
 
 
@@ -76,6 +76,7 @@ extern "C" {
     pub fn Pm_OpenOutput(stream: *const *const c_void, outputDeviceId: c_int, inputDriverInfo: *const c_void, bufferSize: i32, time_proc: *const c_void, time_info: *const c_void, latency: i32) -> PmError;
     pub fn Pm_WriteShort(stream: *const c_void, timestamp: u32, message: c_uint) -> PmError;
     pub fn Pm_Close(stream: *const c_void) -> PmError;
+    pub fn Pm_WriteSysEx(stream: *const c_void, when: u32, msg: *const c_uchar) -> PmError;
 }
 
 struct MidiMessage {
@@ -85,7 +86,7 @@ struct MidiMessage {
     pub data3: u8
 }
 
-static CHANNEL: u8 = 0;
+const CHANNEL: u8 = 0;
 
 impl MidiMessage {
     fn note_on(note: u8) -> MidiMessage {
@@ -110,6 +111,44 @@ fn to_string(s: *const c_char) -> String {
     unsafe { CStr::from_ptr(s) }.to_str().ok().unwrap().to_owned()
 }
 
+
+struct KorgSysEx {
+    pos: usize,
+    data: [u8; 196 + 6]
+}
+
+impl KorgSysEx {
+    fn new() -> KorgSysEx {
+        let mut s = KorgSysEx {
+            pos: 1,
+            data: [0; 196 + 6]
+        };
+        s.data[0] = 0xF0;
+        s.data[1] = 0x42;
+        s.data[2] = 0x30 | CHANNEL;
+        s.data[3] = 0x36;
+        s.data[4] = 0x40;
+        s.data[196 + 5] = 0xF7;
+        s
+    }
+
+    fn add_data(&mut self, d: u8) {
+        self.data[self.pos + 5] = 0x7F & d;
+        let shift: usize = 7 - (self.pos - 1) % 8;
+        let block_idx: usize = 8 * (self.pos / 8);
+        let carry: u8 = (d & 0x80) >> shift;
+        self.data[block_idx + 5] |= carry;
+        self.pos += if shift == 1 { 2 } else { 1 };
+    }
+
+    fn add_name(&mut self, n: &str) {
+        for c in n.as_bytes() {
+            self.add_data(c.to_ascii_lowercase());
+        }
+    }
+}
+
+
 fn main() {
     let start = Instant::now();
     let mut mp = ModulationProfile::new(0.05, -50, 40);
@@ -132,12 +171,19 @@ fn main() {
     let ostream: *const c_void = ptr::null();
     let buffer_size: c_int = 1024;
     let res = unsafe { Pm_OpenOutput(&ostream, device_id, ptr::null(), buffer_size, ptr::null(), ptr::null(), 0) };
-    println!("{}", res as i32);
+    println!("opening output: {}", res as i32);
     thread::sleep(Duration::from_millis(1000));
 
-    let prog28 = MidiMessage::program(28);
+    let prog28 = MidiMessage::program(33);
     let res_prog28 = unsafe { Pm_WriteShort(ostream, 0, prog28.as_u32()) };
-    println!("{:x} gave {}", prog28.as_u32(), res_prog28 as i32);
+    println!("prog change {:x} gave {}", prog28.as_u32(), res_prog28 as i32);
+    thread::sleep(Duration::from_millis(1000));
+
+    let mut ks = KorgSysEx::new();
+    ks.add_name("2021-01-01");
+    let sysex_res = unsafe { Pm_WriteSysEx(ostream, 0, ks.data.as_ptr()) };
+    println!("sys_ex: {}", sysex_res as i32);
+    println!("{:?}", ks.data);
     thread::sleep(Duration::from_millis(1000));
 
     let note = 67;
