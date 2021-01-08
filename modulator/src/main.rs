@@ -4,7 +4,8 @@ use std::{
     f32,
     thread,
     time::{Duration, Instant},
-    os::raw::{c_char, c_int, c_void},
+    os::raw::{c_char, c_int, c_uint, c_void},
+    ptr,
     ffi::CStr
 };
 
@@ -50,20 +51,57 @@ pub struct PmDeviceInfo {
     pub opened: c_int,
 }
 
+#[repr(C)]
+pub enum PmError {
+    PmNoError = 0,
+    PmGotData = 1,
+    PmHostError = -10000,
+    PmInvalidDeviceId = -9999,
+    PmInsufficientMemory = -9998,
+    PmBufferTooSmall = -9997,
+    PmBufferOverflow = -9996,
+    PmBadPtr = -9995, // stream is null or not opened or input/output direction mismatch
+    PmBadData = -9994, // e.g. missing EOX
+    PmInternalError = -9993,
+    PmBufferMaxSize = -9992,
+}
+
+
 #[link(name = "portmidi")]
 extern "C" {
     pub fn Pm_Initialize() -> c_int;
     pub fn Pm_Terminate() -> c_int;
     pub fn Pm_CountDevices() -> c_int;
     pub fn Pm_GetDeviceInfo(id: c_int) -> *const PmDeviceInfo;
-    pub fn Pm_OpenOutput(stream: *const *const c_void,
-                         outputDeviceId: c_int,
-                         inputDriverInfo: *const c_void,
-                         bufferSize: i32,
-                         time_proc: *const c_void,
-                         time_info: *const c_void,
-                         latency: i32) -> c_int;
+    pub fn Pm_OpenOutput(stream: *const *const c_void, outputDeviceId: c_int, inputDriverInfo: *const c_void, bufferSize: i32, time_proc: *const c_void, time_info: *const c_void, latency: i32) -> PmError;
+    pub fn Pm_WriteShort(stream: *const c_void, timestamp: u32, message: c_uint) -> PmError;
+    pub fn Pm_Close(stream: *const c_void) -> PmError;
 }
+
+struct MidiMessage {
+    pub status: u8,
+    pub data1: u8,
+    pub data2: u8,
+    pub data3: u8
+}
+
+static CHANNEL: u8 = 0;
+
+impl MidiMessage {
+    fn note_on(note: u8) -> MidiMessage {
+        MidiMessage { status: 0x90 + CHANNEL, data1: note, data2: 100, data3: 0 }
+    }
+    fn note_off(note: u8) -> MidiMessage {
+        MidiMessage { status: 0x80 + CHANNEL, data1: note, data2: 0, data3: 0 }
+    }
+    fn as_u32(&self) -> u32 {
+        (self.data3 as u32) << 24
+            | (self.data2 as u32) << 16
+            | (self.data1 as u32) << 8
+            | self.status as u32
+    }
+}
+
 
 fn to_string(s: *const c_char) -> String {
     unsafe { CStr::from_ptr(s) }.to_str().ok().unwrap().to_owned()
@@ -82,10 +120,29 @@ fn main() {
     unsafe { Pm_Initialize() };
     let c = unsafe { Pm_CountDevices() };
     println!("{} devices found", c);
+    let device_id: c_int = 2;
 
-    let info_ptr = unsafe { Pm_GetDeviceInfo(2) };
+    let info_ptr = unsafe { Pm_GetDeviceInfo(device_id) };
     println!("{}", unsafe { (*info_ptr).output });
-    println!("{}", to_string(unsafe { (*info_ptr).name }));
+    println!("using {}", to_string(unsafe { (*info_ptr).name }));
 
+    let ostream: *const c_void = ptr::null();
+    let buffer_size: c_int = 1024;
+    let res = unsafe { Pm_OpenOutput(&ostream, device_id, ptr::null(), buffer_size, ptr::null(), ptr::null(), 0) };
+    println!("{}", res as i32);
+    thread::sleep(Duration::from_millis(1000));
+
+    let note = 67;
+    let on = MidiMessage::note_on(note);
+    let off = MidiMessage::note_off(note);
+
+    let res_on = unsafe { Pm_WriteShort(ostream, 0, on.as_u32()) };
+    println!("{:x} gave {}", on.as_u32(), res_on as i32);
+    thread::sleep(Duration::from_millis(2000));
+    let res_off = unsafe { Pm_WriteShort(ostream, 0, off.as_u32()) };
+    println!("{:x} gave {}", off.as_u32(), res_off as i32);
+    thread::sleep(Duration::from_millis(1000));
+
+    unsafe { Pm_Close(ostream) };
     unsafe { Pm_Terminate() };
 }
