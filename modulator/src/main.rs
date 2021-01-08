@@ -1,9 +1,11 @@
-extern crate portmidi as midi;
+extern crate libc;
 
 use std::{
     f32,
     thread,
-    time::{Duration, Instant}
+    time::{Duration, Instant},
+    os::raw::{c_char, c_int, c_void},
+    ffi::CStr
 };
 
 
@@ -38,46 +40,33 @@ impl ModulationProfile {
 }
 
 
-fn print_devices(pm: &midi::PortMidi) {
-    for device in pm.devices().unwrap() {
-        println!("{}", device);
-    }
+#[repr(C)]
+pub struct PmDeviceInfo {
+    pub struct_version: c_int,
+    pub interf: *const c_char,
+    pub name: *const c_char,
+    pub input: c_int,
+    pub output: c_int,
+    pub opened: c_int,
 }
 
+#[link(name = "portmidi")]
+extern "C" {
+    pub fn Pm_Initialize() -> c_int;
+    pub fn Pm_Terminate() -> c_int;
+    pub fn Pm_CountDevices() -> c_int;
+    pub fn Pm_GetDeviceInfo(id: c_int) -> *const PmDeviceInfo;
+    pub fn Pm_OpenOutput(stream: *const *const c_void,
+                         outputDeviceId: c_int,
+                         inputDriverInfo: *const c_void,
+                         bufferSize: i32,
+                         time_proc: *const c_void,
+                         time_info: *const c_void,
+                         latency: i32) -> c_int;
+}
 
-use midi::MidiMessage;
-fn test_midi(mut out_port: midi::OutputPort) {
-    let channel: u8 = 0;
-    let melody: [(u8, u32); 7] = [
-        (60, 1),
-        (60, 2),
-        (67, 1),
-        (67, 2),
-        (69, 1),
-        (69, 2),
-        (67, 3)
-    ];
-
-    for &(note, dur) in melody.iter() {
-        let note_on = MidiMessage {
-            status: 0x90 + channel,
-            data1: note,
-            data2: 100,
-            data3: 0
-        };
-        println!("{}", note_on);
-        out_port.write_message(note_on);
-        thread::sleep(Duration::from_millis(dur as u64 * 400));
-
-        let note_off = MidiMessage {
-            status: 0x80 + channel,
-            data1: note,
-            data2: 0,
-            data3: 0
-        };
-        println!("{}", note_off);
-        out_port.write_message(note_off);
-    }
+fn to_string(s: *const c_char) -> String {
+    unsafe { CStr::from_ptr(s) }.to_str().ok().unwrap().to_owned()
 }
 
 fn main() {
@@ -89,9 +78,14 @@ fn main() {
         println!("{} {} {}", i, mp.current_val, mp.previous_val);
         thread::sleep(Duration::from_millis(100));
     }
-    let context = midi::PortMidi::new().unwrap();
-    let device = context.device(2).unwrap();
-    let out_device = context.output_port(device, 1024).unwrap();
 
-    test_midi(out_device);
+    unsafe { Pm_Initialize() };
+    let c = unsafe { Pm_CountDevices() };
+    println!("{} devices found", c);
+
+    let info_ptr = unsafe { Pm_GetDeviceInfo(2) };
+    println!("{}", unsafe { (*info_ptr).output });
+    println!("{}", to_string(unsafe { (*info_ptr).name }));
+
+    unsafe { Pm_Terminate() };
 }
