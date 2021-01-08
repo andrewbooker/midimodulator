@@ -94,6 +94,9 @@ impl MidiMessage {
     fn note_off(note: u8) -> MidiMessage {
         MidiMessage { status: 0x80 + CHANNEL, data1: note, data2: 0, data3: 0 }
     }
+    fn program(p: u8) -> MidiMessage {
+        MidiMessage { status: 0xC0 + CHANNEL, data1: p, data2: 0, data3: 0 }
+    }
     fn as_u32(&self) -> u32 {
         (self.data3 as u32) << 24
             | (self.data2 as u32) << 16
@@ -130,6 +133,11 @@ fn main() {
     let buffer_size: c_int = 1024;
     let res = unsafe { Pm_OpenOutput(&ostream, device_id, ptr::null(), buffer_size, ptr::null(), ptr::null(), 0) };
     println!("{}", res as i32);
+    thread::sleep(Duration::from_millis(1000));
+
+    let prog28 = MidiMessage::program(28);
+    let res_prog28 = unsafe { Pm_WriteShort(ostream, 0, prog28.as_u32()) };
+    println!("{:x} gave {}", prog28.as_u32(), res_prog28 as i32);
     thread::sleep(Duration::from_millis(1000));
 
     let note = 67;
