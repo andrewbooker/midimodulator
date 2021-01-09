@@ -41,20 +41,38 @@ impl ModulationProfile {
 }
 
 
-
-
-
 fn build_prog_sys_ex(psx: &mut KorgProgramSysEx) {
-    psx
-        .name("2021-01-05")
-        .data(1) // osc: double
-        .data(0) // bit0: poly/mono, bit1: hold off/on
-        .data_double_byte(12) // osc1
-        .data(0) // octave1: -2 ... 1 = 32,16,8,4
-        .data_double_byte(13) // osc2
-        .data(0) // octave2
-        .data(0) // interval
-    ;
+    psx.name("2021-01-05");
+
+    let params = json::parse(r#"
+    {"list": [{"name": "oscillatorMode", "constVal": 1},
+              {"name": "noteMode", "constVal": 0},
+              {"name": "osc1", "values": [2, 3, 4], "doubleByte": true},
+              {"name": "osc1Octave", "minVal": -2, "maxVal": 1},
+              {"name": "osc2", "values": [3, 4, 5], "doubleByte": true},
+              {"name": "osc2Octave", "minVal": -2, "maxVal": 1},
+              {"name": "interval", "constVal": 0}
+    ]}"#).unwrap();
+
+    println!("parsing params");
+    let arr = &params["list"];
+    for i in 0..arr.len() {
+        let a = &arr[i];
+        println!("{}", a["name"]);
+        if a.has_key("constVal") {
+            psx.data(a["constVal"].as_i8().unwrap());
+        } else if a.has_key("maxVal") {
+            psx.data(a["maxVal"].as_i8().unwrap());
+        } else if a.has_key("values") {
+            let v = &a["values"][0];
+            if a.has_key("doubleByte") && a["doubleByte"].as_bool().unwrap() {
+                psx.data_double_byte(v.as_i16().unwrap());
+            } else {
+                psx.data(v.as_i8().unwrap());
+            }
+        }
+    }
+    println!("parsing params finished");
 }
 
 struct KorgInitSysEx {
@@ -90,6 +108,7 @@ fn main() {
     MidiOutDevices::list();
 
     let mut midi_out = MidiOut::using_device(2);
+/*
     let prog28 = MidiMessage::program(28, CHANNEL);
     midi_out.send(&prog28);
     thread::sleep(Duration::from_millis(1000));
@@ -106,9 +125,10 @@ fn main() {
     let kssx = KorgInitSysEx::new();
     midi_out.send_sys_ex(&kssx.data);
     thread::sleep(Duration::from_millis(100));
-
+*/
     midi_out.send(&MidiMessage::program(33, CHANNEL));
     thread::sleep(Duration::from_millis(100));
+
     let mut kpsx = KorgProgramSysEx::new();
     build_prog_sys_ex(&mut kpsx);
 
