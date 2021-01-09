@@ -2,17 +2,15 @@ extern crate libc;
 mod korg;
 mod midi;
 use crate::korg::{CHANNEL, KorgProgramSysEx};
-use crate::midi::{MidiMessage, Pm_Initialize, Pm_Terminate, Pm_CountDevices, Pm_GetDeviceInfo, Pm_OpenOutput, Pm_WriteShort, Pm_WriteSysEx, Pm_Close};
+use crate::midi::{MidiMessage, Pm_WriteSysEx, MidiOut, Pm_GetDeviceInfo, Pm_CountDevices};
 
 use std::{
     f32,
     thread,
     time::{Duration, Instant},
-    os::raw::{c_char, c_int, c_void},
-    ptr,
+    os::raw::{c_char, c_int},
     ffi::{CStr}
 };
-
 
 struct ModulationProfile {
     freq_hz: f32,
@@ -44,17 +42,9 @@ impl ModulationProfile {
     }
 }
 
-
-
-
-
 fn to_string(s: *const c_char) -> String {
     unsafe { CStr::from_ptr(s) }.to_str().ok().unwrap().to_owned()
 }
-
-
-
-
 
 fn build_prog_sys_ex(psx: &mut KorgProgramSysEx) {
     psx
@@ -99,46 +89,35 @@ fn main() {
         thread::sleep(Duration::from_millis(100));
     }
 
-    unsafe { Pm_Initialize() };
     let c = unsafe { Pm_CountDevices() };
     println!("{} devices found", c);
     let device_id: c_int = 2;
-
     let info_ptr = unsafe { Pm_GetDeviceInfo(device_id) };
     println!("{}", unsafe { (*info_ptr).output });
     println!("using {}", to_string(unsafe { (*info_ptr).name }));
 
-    let ostream: *const c_void = ptr::null();
-    let buffer_size: c_int = 1024;
-    let res = unsafe { Pm_OpenOutput(&ostream, device_id, ptr::null(), buffer_size, ptr::null(), ptr::null(), 0) };
-    println!("opening output: {}", res as i32);
-    thread::sleep(Duration::from_millis(1000));
-
-    let prog28 = MidiMessage::program(33, CHANNEL);
-    let res_prog28 = unsafe { Pm_WriteShort(ostream, 0, prog28.as_u32()) };
-    println!("prog change {:x} gave {}", prog28.as_u32(), res_prog28 as i32);
-    thread::sleep(Duration::from_millis(1000));
-
-    let kssx = KorgInitSysEx::new();
-    let sysex_res = unsafe { Pm_WriteSysEx(ostream, 0, kssx.data.as_ptr()) };
-    println!("sys_ex: {}", sysex_res as i32);
-    println!("{:?}", kssx.data);
+    let mut midi_out = MidiOut::using_device(2);
+    let prog28 = MidiMessage::program(28, CHANNEL);
+    midi_out.send(&prog28);
     thread::sleep(Duration::from_millis(1000));
 
     let note = 67;
     let on = MidiMessage::note_on(note, CHANNEL);
     let off = MidiMessage::note_off(note, CHANNEL);
 
-    let res_on = unsafe { Pm_WriteShort(ostream, 0, on.as_u32()) };
-    println!("{:x} gave {}", on.as_u32(), res_on as i32);
+    midi_out.send(&on);
     thread::sleep(Duration::from_millis(2000));
-    let res_off = unsafe { Pm_WriteShort(ostream, 0, off.as_u32()) };
-    println!("{:x} gave {}", off.as_u32(), res_off as i32);
+    midi_out.send(&off);
     thread::sleep(Duration::from_millis(1000));
 
-    unsafe { Pm_Close(ostream) };
-    unsafe { Pm_Terminate() };
+    let kssx = KorgInitSysEx::new();
+    let sysex_res = unsafe { Pm_WriteSysEx(midi_out.ostream, 0, kssx.data.as_ptr()) };
+    println!("sys_ex: {}", sysex_res as i32);
+    println!("{:?}", kssx.data);
+    thread::sleep(Duration::from_millis(1000));
 
+    midi_out.send(&MidiMessage::program(33, CHANNEL));
+    thread::sleep(Duration::from_millis(100));
     let mut kpsx = KorgProgramSysEx::new();
     build_prog_sys_ex(&mut kpsx);
 

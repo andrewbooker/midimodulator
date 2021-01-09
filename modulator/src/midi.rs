@@ -1,4 +1,9 @@
-use std::os::raw::{c_char, c_uchar, c_int, c_uint, c_void};
+use std::{
+    os::raw::{c_char, c_uchar, c_int, c_uint, c_void},
+    ptr,
+    thread,
+    time::Duration
+};
 
 #[repr(C)]
 pub struct PmDeviceInfo {
@@ -45,7 +50,6 @@ pub struct MidiMessage {
     pub data3: u8
 }
 
-
 impl MidiMessage {
     pub fn note_on(note: u8, channel: u8) -> MidiMessage {
         MidiMessage { status: 0x90 | channel, data1: note, data2: 100, data3: 0 }
@@ -61,5 +65,36 @@ impl MidiMessage {
             | (self.data2 as u32) << 16
             | (self.data1 as u32) << 8
             | self.status as u32
+    }
+}
+
+pub struct MidiOut {
+    pub ostream: *const c_void
+}
+
+impl MidiOut {
+    pub fn using_device(id: i32) -> MidiOut {
+        unsafe { Pm_Initialize() };
+        let m = MidiOut {
+            ostream: ptr::null()
+        };
+        let buffer_size: c_int = 1024;
+        let res = unsafe { Pm_OpenOutput(&m.ostream, id, ptr::null(), buffer_size, ptr::null(), ptr::null(), 0) };
+        println!("opening output: {}", res as i32);
+        thread::sleep(Duration::from_millis(1000));
+        m
+    }
+
+    pub fn send(&mut self, m: &MidiMessage) {
+        let res = unsafe { Pm_WriteShort(self.ostream, 0, m.as_u32()) };
+        println!("prog change {:x} gave {}", m.as_u32(), res as i32);
+    }
+}
+
+impl Drop for MidiOut {
+    fn drop(&mut self) {
+        unsafe { Pm_Close(self.ostream) };
+        unsafe { Pm_Terminate() };
+        println!("MidiOut closed");
     }
 }
