@@ -89,6 +89,11 @@ impl MidiOut {
         let res = unsafe { Pm_WriteShort(self.ostream, 0, m.as_u32()) };
         println!("prog change {:x} gave {}", m.as_u32(), res as i32);
     }
+
+    pub fn send_sys_ex(&mut self, data: &[u8]) {
+        let res = unsafe { Pm_WriteSysEx(self.ostream, 0, data.as_ptr()) };
+        println!("sys_ex: {}", res as i32);
+    }
 }
 
 impl Drop for MidiOut {

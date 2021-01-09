@@ -2,7 +2,7 @@ extern crate libc;
 mod korg;
 mod midi;
 use crate::korg::{CHANNEL, KorgProgramSysEx};
-use crate::midi::{MidiMessage, Pm_WriteSysEx, MidiOut, Pm_GetDeviceInfo, Pm_CountDevices};
+use crate::midi::{MidiMessage, MidiOut, Pm_GetDeviceInfo, Pm_CountDevices};
 
 use std::{
     f32,
@@ -111,10 +111,8 @@ fn main() {
     thread::sleep(Duration::from_millis(1000));
 
     let kssx = KorgInitSysEx::new();
-    let sysex_res = unsafe { Pm_WriteSysEx(midi_out.ostream, 0, kssx.data.as_ptr()) };
-    println!("sys_ex: {}", sysex_res as i32);
-    println!("{:?}", kssx.data);
-    thread::sleep(Duration::from_millis(1000));
+    midi_out.send_sys_ex(&kssx.data);
+    thread::sleep(Duration::from_millis(100));
 
     midi_out.send(&MidiMessage::program(33, CHANNEL));
     thread::sleep(Duration::from_millis(100));
