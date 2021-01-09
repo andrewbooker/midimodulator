@@ -159,7 +159,7 @@ impl KorgProgramSysEx {
 
 fn build_prog_sys_ex(psx: &mut KorgProgramSysEx) {
     psx
-        .name("2021-01-03")
+        .name("2021-01-05")
         .data(1) // osc: double
         .data(0) // bit0: poly/mono, bit1: hold off/on
         .data_double_byte(12) // osc1
@@ -168,6 +168,25 @@ fn build_prog_sys_ex(psx: &mut KorgProgramSysEx) {
         .data(0) // octave2
         .data(0) // interval
     ;
+}
+
+struct KorgInitSysEx {
+    data: [u8; 8]
+}
+
+impl KorgInitSysEx {
+    fn new() -> KorgInitSysEx {
+        KorgInitSysEx {
+            data: [0xF0,
+                   0x42, // ID of Korg
+                   0x30 | CHANNEL, // format ID (3), channel
+                   0x36, // 05R/W ID
+                   0x4E, // mode change
+                   0x03, // program edit
+                   0x00,
+                   0xF7]
+        }
+    }
 }
 
 
@@ -201,11 +220,10 @@ fn main() {
     println!("prog change {:x} gave {}", prog28.as_u32(), res_prog28 as i32);
     thread::sleep(Duration::from_millis(1000));
 
-    let mut ks = KorgProgramSysEx::new();
-    build_prog_sys_ex(&mut ks);
-    let sysex_res = unsafe { Pm_WriteSysEx(ostream, 0, ks.data.as_ptr()) };
+    let kssx = KorgInitSysEx::new();
+    let sysex_res = unsafe { Pm_WriteSysEx(ostream, 0, kssx.data.as_ptr()) };
     println!("sys_ex: {}", sysex_res as i32);
-    println!("{:?}", ks.data);
+    println!("{:?}", kssx.data);
     thread::sleep(Duration::from_millis(1000));
 
     let note = 67;
@@ -221,4 +239,18 @@ fn main() {
 
     unsafe { Pm_Close(ostream) };
     unsafe { Pm_Terminate() };
+
+    let mut kpsx = KorgProgramSysEx::new();
+    build_prog_sys_ex(&mut kpsx);
+
+    let ports = serialport::available_ports().expect("No ports found!");
+    for p in ports {
+        println!("{}", p.port_name);
+    }
+    let mut port = serialport::new("/dev/ttyUSB0", 38400)
+                    .timeout(Duration::from_millis(1000))
+                    .open()
+                    .expect("Failed to open port");
+
+    port.write(&kpsx.data).expect("Write failed!");
 }
