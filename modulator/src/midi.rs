@@ -1,0 +1,65 @@
+use std::os::raw::{c_char, c_uchar, c_int, c_uint, c_void};
+
+#[repr(C)]
+pub struct PmDeviceInfo {
+    pub struct_version: c_int,
+    pub interf: *const c_char,
+    pub name: *const c_char,
+    pub input: c_int,
+    pub output: c_int,
+    pub opened: c_int,
+}
+
+#[repr(C)]
+pub enum PmError {
+    PmNoError = 0,
+    PmGotData = 1,
+    PmHostError = -10000,
+    PmInvalidDeviceId = -9999,
+    PmInsufficientMemory = -9998,
+    PmBufferTooSmall = -9997,
+    PmBufferOverflow = -9996,
+    PmBadPtr = -9995, // stream is null or not opened or input/output direction mismatch
+    PmBadData = -9994, // e.g. missing EOX
+    PmInternalError = -9993,
+    PmBufferMaxSize = -9992,
+}
+
+
+#[link(name = "portmidi")]
+extern "C" {
+    pub fn Pm_Initialize() -> c_int;
+    pub fn Pm_Terminate() -> c_int;
+    pub fn Pm_CountDevices() -> c_int;
+    pub fn Pm_GetDeviceInfo(id: c_int) -> *const PmDeviceInfo;
+    pub fn Pm_OpenOutput(stream: *const *const c_void, outputDeviceId: c_int, inputDriverInfo: *const c_void, bufferSize: i32, time_proc: *const c_void, time_info: *const c_void, latency: i32) -> PmError;
+    pub fn Pm_WriteShort(stream: *const c_void, timestamp: u32, message: c_uint) -> PmError;
+    pub fn Pm_Close(stream: *const c_void) -> PmError;
+    pub fn Pm_WriteSysEx(stream: *const c_void, when: u32, msg: *const c_uchar) -> PmError;
+}
+
+pub struct MidiMessage {
+    pub status: u8,
+    pub data1: u8,
+    pub data2: u8,
+    pub data3: u8
+}
+
+
+impl MidiMessage {
+    pub fn note_on(note: u8, channel: u8) -> MidiMessage {
+        MidiMessage { status: 0x90 | channel, data1: note, data2: 100, data3: 0 }
+    }
+    pub fn note_off(note: u8, channel: u8) -> MidiMessage {
+        MidiMessage { status: 0x80 | channel, data1: note, data2: 0, data3: 0 }
+    }
+    pub fn program(p: u8, channel: u8) -> MidiMessage {
+        MidiMessage { status: 0xC0 | channel, data1: p, data2: 0, data3: 0 }
+    }
+    pub fn as_u32(&self) -> u32 {
+        (self.data3 as u32) << 24
+            | (self.data2 as u32) << 16
+            | (self.data1 as u32) << 8
+            | self.status as u32
+    }
+}

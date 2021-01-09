@@ -1,12 +1,14 @@
 extern crate libc;
 mod korg;
+mod midi;
 use crate::korg::{CHANNEL, KorgProgramSysEx};
+use crate::midi::{MidiMessage, Pm_Initialize, Pm_Terminate, Pm_CountDevices, Pm_GetDeviceInfo, Pm_OpenOutput, Pm_WriteShort, Pm_WriteSysEx, Pm_Close};
 
 use std::{
     f32,
     thread,
     time::{Duration, Instant},
-    os::raw::{c_char, c_uchar, c_int, c_uint, c_void},
+    os::raw::{c_char, c_int, c_void},
     ptr,
     ffi::{CStr}
 };
@@ -43,70 +45,7 @@ impl ModulationProfile {
 }
 
 
-#[repr(C)]
-pub struct PmDeviceInfo {
-    pub struct_version: c_int,
-    pub interf: *const c_char,
-    pub name: *const c_char,
-    pub input: c_int,
-    pub output: c_int,
-    pub opened: c_int,
-}
 
-#[repr(C)]
-pub enum PmError {
-    PmNoError = 0,
-    PmGotData = 1,
-    PmHostError = -10000,
-    PmInvalidDeviceId = -9999,
-    PmInsufficientMemory = -9998,
-    PmBufferTooSmall = -9997,
-    PmBufferOverflow = -9996,
-    PmBadPtr = -9995, // stream is null or not opened or input/output direction mismatch
-    PmBadData = -9994, // e.g. missing EOX
-    PmInternalError = -9993,
-    PmBufferMaxSize = -9992,
-}
-
-
-#[link(name = "portmidi")]
-extern "C" {
-    pub fn Pm_Initialize() -> c_int;
-    pub fn Pm_Terminate() -> c_int;
-    pub fn Pm_CountDevices() -> c_int;
-    pub fn Pm_GetDeviceInfo(id: c_int) -> *const PmDeviceInfo;
-    pub fn Pm_OpenOutput(stream: *const *const c_void, outputDeviceId: c_int, inputDriverInfo: *const c_void, bufferSize: i32, time_proc: *const c_void, time_info: *const c_void, latency: i32) -> PmError;
-    pub fn Pm_WriteShort(stream: *const c_void, timestamp: u32, message: c_uint) -> PmError;
-    pub fn Pm_Close(stream: *const c_void) -> PmError;
-    pub fn Pm_WriteSysEx(stream: *const c_void, when: u32, msg: *const c_uchar) -> PmError;
-}
-
-struct MidiMessage {
-    pub status: u8,
-    pub data1: u8,
-    pub data2: u8,
-    pub data3: u8
-}
-
-
-
-impl MidiMessage {
-    fn note_on(note: u8) -> MidiMessage {
-        MidiMessage { status: 0x90 + CHANNEL, data1: note, data2: 100, data3: 0 }
-    }
-    fn note_off(note: u8) -> MidiMessage {
-        MidiMessage { status: 0x80 + CHANNEL, data1: note, data2: 0, data3: 0 }
-    }
-    fn program(p: u8) -> MidiMessage {
-        MidiMessage { status: 0xC0 + CHANNEL, data1: p, data2: 0, data3: 0 }
-    }
-    fn as_u32(&self) -> u32 {
-        (self.data3 as u32) << 24
-            | (self.data2 as u32) << 16
-            | (self.data1 as u32) << 8
-            | self.status as u32
-    }
-}
 
 
 fn to_string(s: *const c_char) -> String {
@@ -175,7 +114,7 @@ fn main() {
     println!("opening output: {}", res as i32);
     thread::sleep(Duration::from_millis(1000));
 
-    let prog28 = MidiMessage::program(33);
+    let prog28 = MidiMessage::program(33, CHANNEL);
     let res_prog28 = unsafe { Pm_WriteShort(ostream, 0, prog28.as_u32()) };
     println!("prog change {:x} gave {}", prog28.as_u32(), res_prog28 as i32);
     thread::sleep(Duration::from_millis(1000));
@@ -187,8 +126,8 @@ fn main() {
     thread::sleep(Duration::from_millis(1000));
 
     let note = 67;
-    let on = MidiMessage::note_on(note);
-    let off = MidiMessage::note_off(note);
+    let on = MidiMessage::note_on(note, CHANNEL);
+    let off = MidiMessage::note_off(note, CHANNEL);
 
     let res_on = unsafe { Pm_WriteShort(ostream, 0, on.as_u32()) };
     println!("{:x} gave {}", on.as_u32(), res_on as i32);
