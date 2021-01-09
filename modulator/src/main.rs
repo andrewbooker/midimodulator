@@ -2,14 +2,12 @@ extern crate libc;
 mod korg;
 mod midi;
 use crate::korg::{CHANNEL, KorgProgramSysEx};
-use crate::midi::{MidiMessage, MidiOut, Pm_GetDeviceInfo, Pm_CountDevices};
+use crate::midi::{MidiMessage, MidiOut, MidiOutDevices};
 
 use std::{
     f32,
     thread,
-    time::{Duration, Instant},
-    os::raw::{c_char, c_int},
-    ffi::{CStr}
+    time::{Duration, Instant}
 };
 
 struct ModulationProfile {
@@ -40,10 +38,6 @@ impl ModulationProfile {
         let val = self.min_val as f32 + ((self.max_val - self.min_val) as f32 * 0.5 * (1.0 + (dt * 0.001 * ang_freq).cos()));
         self.current_val = val.round() as i32;
     }
-}
-
-fn to_string(s: *const c_char) -> String {
-    unsafe { CStr::from_ptr(s) }.to_str().ok().unwrap().to_owned()
 }
 
 fn build_prog_sys_ex(psx: &mut KorgProgramSysEx) {
@@ -89,12 +83,7 @@ fn main() {
         thread::sleep(Duration::from_millis(100));
     }
 
-    let c = unsafe { Pm_CountDevices() };
-    println!("{} devices found", c);
-    let device_id: c_int = 2;
-    let info_ptr = unsafe { Pm_GetDeviceInfo(device_id) };
-    println!("{}", unsafe { (*info_ptr).output });
-    println!("using {}", to_string(unsafe { (*info_ptr).name }));
+    MidiOutDevices::list();
 
     let mut midi_out = MidiOut::using_device(2);
     let prog28 = MidiMessage::program(28, CHANNEL);

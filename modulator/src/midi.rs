@@ -2,7 +2,8 @@ use std::{
     os::raw::{c_char, c_uchar, c_int, c_uint, c_void},
     ptr,
     thread,
-    time::Duration
+    time::Duration,
+    ffi::{CStr}
 };
 
 #[repr(C)]
@@ -15,6 +16,7 @@ pub struct PmDeviceInfo {
     pub opened: c_int,
 }
 
+#[allow(dead_code)]
 #[repr(C)]
 pub enum PmError {
     PmNoError = 0,
@@ -44,10 +46,10 @@ extern "C" {
 }
 
 pub struct MidiMessage {
-    pub status: u8,
-    pub data1: u8,
-    pub data2: u8,
-    pub data3: u8
+    status: u8,
+    data1: u8,
+    data2: u8,
+    data3: u8
 }
 
 impl MidiMessage {
@@ -68,8 +70,26 @@ impl MidiMessage {
     }
 }
 
+fn to_string(s: *const c_char) -> String {
+    unsafe { CStr::from_ptr(s) }.to_str().ok().unwrap().to_owned()
+}
+
+pub struct MidiOutDevices;
+impl MidiOutDevices {
+    pub fn list() {
+        let n = unsafe { Pm_CountDevices() };
+        for d in 0..n {
+            let info_ptr = unsafe { Pm_GetDeviceInfo(d) };
+            if 1 == unsafe { (*info_ptr).output } {
+                println!("{}", to_string(unsafe { (*info_ptr).name }));
+            }
+        }
+    }
+}
+
+
 pub struct MidiOut {
-    pub ostream: *const c_void
+    ostream: *const c_void
 }
 
 impl MidiOut {
