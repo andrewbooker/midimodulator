@@ -20,25 +20,25 @@ impl KorgProgramSysEx {
         s
     }
 
-    pub fn data(&mut self, d: u8) -> &mut KorgProgramSysEx {
-        self.data[self.pos + 5] = 0x7F & d;
+    pub fn data(&mut self, d: i8) -> &mut KorgProgramSysEx {
+        self.data[self.pos + 5] = (0x7F & d) as u8;
         let shift: usize = 7 - (self.pos - 1) % 8;
         let block_idx: usize = 8 * (self.pos / 8);
-        let carry: u8 = (d & 0x80) >> shift;
+        let carry: u8 = (d as u8 & 0x80) >> shift;
         self.data[block_idx + 5] |= carry;
         self.pos += if shift == 1 { 2 } else { 1 };
         self
     }
 
-    pub fn data_double_byte(&mut self, d: u16) -> &mut KorgProgramSysEx {
-        self.data(d as u8);
-        self.data((d >> 8) as u8);
+    pub fn data_double_byte(&mut self, d: i16) -> &mut KorgProgramSysEx {
+        self.data(d as i8);
+        self.data((d >> 8) as i8);
         self
     }
 
     pub fn name(&mut self, n: &str) -> &mut KorgProgramSysEx {
         for c in n.chars() {
-            self.data(c as u8);
+            self.data(c as i8);
         }
         self
     }

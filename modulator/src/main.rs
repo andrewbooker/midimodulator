@@ -12,15 +12,15 @@ use std::{
 
 struct ModulationProfile {
     freq_hz: f32,
-    min_val: i32,
-    max_val: i32,
+    min_val: i16,
+    max_val: i16,
 
-    previous_val: i32,
-    current_val: i32
+    previous_val: i16,
+    current_val: i16
 }
 
 impl ModulationProfile {
-    fn new(f_hz: f32, min_v: i32, max_v: i32) -> ModulationProfile {
+    fn new(f_hz: f32, min_v: i16, max_v: i16) -> ModulationProfile {
         ModulationProfile {
             freq_hz: f_hz,
             min_val: min_v,
@@ -36,9 +36,13 @@ impl ModulationProfile {
 
         self.previous_val = self.current_val;
         let val = self.min_val as f32 + ((self.max_val - self.min_val) as f32 * 0.5 * (1.0 + (dt * 0.001 * ang_freq).cos()));
-        self.current_val = val.round() as i32;
+        self.current_val = val.round() as i16;
     }
 }
+
+
+
+
 
 fn build_prog_sys_ex(psx: &mut KorgProgramSysEx) {
     psx
