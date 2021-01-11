@@ -10,23 +10,35 @@ use std::{
     time::{Duration, Instant}
 };
 
-struct ModulationProfile {
-    freq_hz: f32,
-    min_val: i16,
-    max_val: i16,
 
+struct ConstParam {
+    val: i8
+}
+
+struct SweepableParam {
+    max_val: i16,
+    min_val: i16
+}
+
+const OSCILLATOR_MODE: ConstParam = ConstParam{ val: 1 };
+const NOTE_MODE: ConstParam = ConstParam{ val: 0 };
+
+const DETUNE: SweepableParam = SweepableParam { min_val: -17, max_val: 17 };
+
+struct Sweeper<'a> {
+    original: &'a SweepableParam,
+    freq_hz: f32,
     previous_val: i16,
     current_val: i16
 }
 
-impl ModulationProfile {
-    fn new(f_hz: f32, min_v: i16, max_v: i16) -> ModulationProfile {
-        ModulationProfile {
+impl Sweeper<'_> {
+    fn new<'a>(f_hz: f32, p: &'a SweepableParam) -> Sweeper<'a> {
+        Sweeper {
             freq_hz: f_hz,
-            min_val: min_v,
-            max_val: max_v,
-            current_val: max_v,
-            previous_val: max_v
+            original: p,
+            current_val: p.max_val,
+            previous_val: p.max_val
         }
     }
 
@@ -35,19 +47,31 @@ impl ModulationProfile {
         let ang_freq = self.freq_hz * 2.0 * f32::consts::PI as f32;
 
         self.previous_val = self.current_val;
-        let val = self.min_val as f32 + ((self.max_val - self.min_val) as f32 * 0.5 * (1.0 + (dt * 0.001 * ang_freq).cos()));
+        let val = self.original.min_val as f32 + ((self.original.max_val - self.original.min_val) as f32 * 0.5 * (1.0 + (dt * 0.001 * ang_freq).cos()));
         self.current_val = val.round() as i16;
     }
 }
 
+trait ConstSyxExAppender {
+    fn append_to(&self, psx: &mut KorgProgramSysEx);
+}
+trait SyxExAppender {
+    fn append_to(&mut self, psx: &mut KorgProgramSysEx);
+}
+
+impl ConstSyxExAppender for ConstParam {
+    fn append_to(&self, psx: &mut KorgProgramSysEx) {
+        psx.data(self.val);
+    }
+}
 
 fn build_prog_sys_ex(psx: &mut KorgProgramSysEx) {
     psx.name("2021-01-05");
+    OSCILLATOR_MODE.append_to(psx);
+    NOTE_MODE.append_to(psx);
 
     let params = json::parse(r#"
-    {"list": [{"name": "oscillatorMode", "constVal": 1},
-              {"name": "noteMode", "constVal": 0},
-              {"name": "osc1", "values": [2, 3, 4], "doubleByte": true},
+    {"list": [{"name": "osc1", "values": [2, 3, 4], "doubleByte": true},
               {"name": "osc1Octave", "minVal": -2, "maxVal": 1},
               {"name": "osc2", "values": [3, 4, 5], "doubleByte": true},
               {"name": "osc2Octave", "minVal": -2, "maxVal": 1},
@@ -97,7 +121,7 @@ impl KorgInitSysEx {
 
 fn main() {
     let start = Instant::now();
-    let mut mp = ModulationProfile::new(0.05, -50, 40);
+    let mut mp = Sweeper::new(0.05, &DETUNE);
 
     for i in 0..10 {
         mp.update(&start);
@@ -108,7 +132,7 @@ fn main() {
     MidiOutDevices::list();
 
     let mut midi_out = MidiOut::using_device(2);
-/*
+
     let prog28 = MidiMessage::program(28, CHANNEL);
     midi_out.send(&prog28);
     thread::sleep(Duration::from_millis(1000));
@@ -122,11 +146,11 @@ fn main() {
     midi_out.send(&off);
     thread::sleep(Duration::from_millis(1000));
 
+    midi_out.send(&MidiMessage::program(33, CHANNEL));
+    thread::sleep(Duration::from_millis(100));
+
     let kssx = KorgInitSysEx::new();
     midi_out.send_sys_ex(&kssx.data);
-    thread::sleep(Duration::from_millis(100));
-*/
-    midi_out.send(&MidiMessage::program(33, CHANNEL));
     thread::sleep(Duration::from_millis(100));
 
     let mut kpsx = KorgProgramSysEx::new();
