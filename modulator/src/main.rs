@@ -24,6 +24,7 @@ const OSCILLATORS: [i16; 11] = [0,1,2,3,4,5,6,7,8,9,10];
 const OSCILLATOR_MODE: ConstParam = ConstParam{ val: 1 };
 const NOTE_MODE: ConstParam = ConstParam{ val: 0 };
 const NOTE_REGISTER: ConstParam = ConstParam{ val: 0 };
+const INTERVAL: ConstParam = ConstParam{ val: 0 };
 
 const DETUNE: SweepableParam = SweepableParam { min_val: -17, max_val: 17 };
 const VOLUME: SweepableParam = SweepableParam { min_val: 0, max_val: 99 };
@@ -104,32 +105,9 @@ fn build_prog_sys_ex(psx: &mut KorgProgramSysEx, osc1: &dyn SyxExAppender, osc2:
     NOTE_MODE.append_to(psx);
     osc1.append_to(psx);
     NOTE_REGISTER.append_to(psx);
-
-    let params = json::parse(r#"
-    {"list": [{"name": "osc2", "values": [3, 4, 5], "doubleByte": true},
-              {"name": "osc2Octave", "minVal": -2, "maxVal": 1},
-              {"name": "interval", "constVal": 0}
-    ]}"#).unwrap();
-
-    println!("parsing params");
-    let arr = &params["list"];
-    for i in 0..arr.len() {
-        let a = &arr[i];
-        println!("{}", a["name"]);
-        if a.has_key("constVal") {
-            psx.data(a["constVal"].as_i8().unwrap());
-        } else if a.has_key("maxVal") {
-            psx.data(a["maxVal"].as_i8().unwrap());
-        } else if a.has_key("values") {
-            let v = &a["values"][0];
-            if a.has_key("doubleByte") && a["doubleByte"].as_bool().unwrap() {
-                psx.data_double_byte(v.as_i16().unwrap());
-            } else {
-                psx.data(v.as_i8().unwrap());
-            }
-        }
-    }
-    println!("parsing params finished");
+    osc1.append_to(psx);
+    NOTE_REGISTER.append_to(psx);
+    INTERVAL.append_to(psx);
     detune.append_to(psx);
 }
 
