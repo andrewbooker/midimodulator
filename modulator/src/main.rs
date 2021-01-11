@@ -16,20 +16,24 @@ struct ConstParam {
 }
 
 struct SweepableParam {
-    max_val: i16,
-    min_val: i16
+    max_val: i8,
+    min_val: i8
 }
 
+const OSCILLATORS: [i16; 11] = [0,1,2,3,4,5,6,7,8,9,10];
 const OSCILLATOR_MODE: ConstParam = ConstParam{ val: 1 };
 const NOTE_MODE: ConstParam = ConstParam{ val: 0 };
+const NOTE_REGISTER: ConstParam = ConstParam{ val: 0 };
 
 const DETUNE: SweepableParam = SweepableParam { min_val: -17, max_val: 17 };
+const VOLUME: SweepableParam = SweepableParam { min_val: 0, max_val: 99 };
+
 
 struct Sweeper<'a> {
     original: &'a SweepableParam,
     freq_hz: f32,
-    previous_val: i16,
-    current_val: i16
+    previous_val: i8,
+    current_val: i8
 }
 
 impl Sweeper<'_> {
@@ -48,32 +52,61 @@ impl Sweeper<'_> {
 
         self.previous_val = self.current_val;
         let val = self.original.min_val as f32 + ((self.original.max_val - self.original.min_val) as f32 * 0.5 * (1.0 + (dt * 0.001 * ang_freq).cos()));
-        self.current_val = val.round() as i16;
+        self.current_val = val.round() as i8;
     }
 }
 
-trait ConstSyxExAppender {
-    fn append_to(&self, psx: &mut KorgProgramSysEx);
-}
-trait SyxExAppender {
-    fn append_to(&mut self, psx: &mut KorgProgramSysEx);
+struct Selector<'b> {
+    options: &'b[i16],
+    current_val: i16
 }
 
-impl ConstSyxExAppender for ConstParam {
+impl Selector<'_> {
+    fn new<'b>(opts: &'b[i16]) -> Selector<'b> {
+        Selector {
+            options: opts,
+            current_val: opts[0] // should select anything from options.
+        }
+    }
+    fn update<'b>(&mut self, sweeper: &'b Sweeper) {
+        if sweeper.current_val == 0 {
+            self.current_val = self.options[2];
+        }
+    }
+}
+
+
+trait SyxExAppender {
+    fn append_to(&self, psx: &mut KorgProgramSysEx);
+}
+
+impl SyxExAppender for ConstParam {
     fn append_to(&self, psx: &mut KorgProgramSysEx) {
         psx.data(self.val);
     }
 }
 
-fn build_prog_sys_ex(psx: &mut KorgProgramSysEx) {
+impl SyxExAppender for Sweeper<'_> {
+    fn append_to(&self, psx: &mut KorgProgramSysEx) {
+        psx.data(self.current_val);
+    }
+}
+
+impl SyxExAppender for Selector<'_> { // so far only good for Oscillators as they are i16
+    fn append_to(&self, psx: &mut KorgProgramSysEx) {
+        psx.data_double_byte(self.current_val);
+    }
+}
+
+fn build_prog_sys_ex(psx: &mut KorgProgramSysEx, osc1: &dyn SyxExAppender, osc2: &dyn SyxExAppender, detune: &dyn SyxExAppender) {
     psx.name("2021-01-05");
     OSCILLATOR_MODE.append_to(psx);
     NOTE_MODE.append_to(psx);
+    osc1.append_to(psx);
+    NOTE_REGISTER.append_to(psx);
 
     let params = json::parse(r#"
-    {"list": [{"name": "osc1", "values": [2, 3, 4], "doubleByte": true},
-              {"name": "osc1Octave", "minVal": -2, "maxVal": 1},
-              {"name": "osc2", "values": [3, 4, 5], "doubleByte": true},
+    {"list": [{"name": "osc2", "values": [3, 4, 5], "doubleByte": true},
               {"name": "osc2Octave", "minVal": -2, "maxVal": 1},
               {"name": "interval", "constVal": 0}
     ]}"#).unwrap();
@@ -97,6 +130,7 @@ fn build_prog_sys_ex(psx: &mut KorgProgramSysEx) {
         }
     }
     println!("parsing params finished");
+    detune.append_to(psx);
 }
 
 struct KorgInitSysEx {
@@ -121,11 +155,19 @@ impl KorgInitSysEx {
 
 fn main() {
     let start = Instant::now();
-    let mut mp = Sweeper::new(0.05, &DETUNE);
+    let mut detune = Sweeper::new(0.05, &DETUNE);
+    let mut vol1 = Sweeper::new(0.04, &VOLUME);
+    let mut vol2 = Sweeper::new(0.04, &VOLUME);
+    let mut osc1 = Selector::new(&OSCILLATORS);
+    let mut osc2 = Selector::new(&OSCILLATORS);
 
     for i in 0..10 {
-        mp.update(&start);
-        println!("{} {} {}", i, mp.current_val, mp.previous_val);
+        detune.update(&start);
+        println!("{} {} {}", i, detune.current_val, detune.previous_val);
+        vol1.update(&start);
+        vol2.update(&start);
+        osc1.update(&vol1);
+        osc2.update(&vol2);
         thread::sleep(Duration::from_millis(100));
     }
 
@@ -154,7 +196,7 @@ fn main() {
     thread::sleep(Duration::from_millis(100));
 
     let mut kpsx = KorgProgramSysEx::new();
-    build_prog_sys_ex(&mut kpsx);
+    build_prog_sys_ex(&mut kpsx, &osc1, &osc2, &detune);
 
     let ports = serialport::available_ports().expect("No ports found!");
     for p in ports {
