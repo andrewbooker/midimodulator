@@ -41,6 +41,9 @@ enum Updater<'a> {
     SelectOnZero(&'a str, &'a str, bool)
 }
 
+const ENV_TIME_LOW: i8 = 1;
+const ENV_TIME_HIGH: i8 = 10;
+
 const PROGRAM_SPEC: [Updater; 28] = [
     Updater::Const("oscillatorMode", 1),
     Updater::Const("noteMode", 0),
@@ -55,13 +58,13 @@ const PROGRAM_SPEC: [Updater; 28] = [
     Updater::Const("env_pitch_startLevel", 0),
     Updater::Sweep("env_pitch_attackTime", 1, 4),
     Updater::Sweep("env_pitch_attackLevel", -7, 7),
-    Updater::Sweep("env_pitch_decayTime", 10, 30),
-    Updater::Sweep("env_pitch_releaseTime", 10, 30),
+    Updater::Sweep("env_pitch_decayTime", ENV_TIME_LOW, ENV_TIME_HIGH),
+    Updater::Sweep("env_pitch_releaseTime", ENV_TIME_LOW, ENV_TIME_HIGH),
     Updater::Sweep("env_pitch_releaseLevel", -8, 0),
 
     Updater::Const("pitchEgTimeVelocitySens", 0),
     Updater::Const("pitchEgLevelVelocitySens", 0),
-    Updater::Const("cutoffTypeDetails", 0),  // cutoff type (bits 1-4 = waveform 0=TRI, bit5=osc1 enable, bit6=osc2 enable, bit7=key sync)
+    Updater::Const("cutoffTypeDetails", 0), // cutoff type (bits 1-4 = waveform 0=TRI, bit5=osc1 enable, bit6=osc2 enable, bit7=key sync)
     Updater::Sweep("modFreq", 20, 99),
     Updater::Sweep("modDelay", 1, 40),
     Updater::Sweep("modIntensity", 1, 40),
@@ -75,12 +78,52 @@ const PROGRAM_SPEC: [Updater; 28] = [
     Updater::Const("joystickVdfModulationIntensity", 0)
 ];
 
-const OSC_SPEC: [Updater; 2] = [
+const OSC_SPEC: [Updater; 44] = [
     Updater::Sweep("pitchEgIntensity", 1, 20),
-    Updater::Const("pitchWaveform", 0) // bits 1-4 = waveform, bit7=key sync)
+    Updater::Const("pitchWaveform", 0), // bits 1-4 = waveform, bit7=key sync)
+    Updater::Sweep("pitchEgFreq", 10, 50),
+    Updater::Sweep("pitchEgDelay", 5, 50),
+    Updater::Sweep("pitchEgFadeIn", 3, 20),
+    Updater::Sweep("pitchModulationIntensity", 1, 10),
+    Updater::Const("pitchFreqModKeyTracking", -5),
+    Updater::Const("pitchModIntensityAftertouch", 0),
+    Updater::Const("pitchModIntensityJoystick", 0),
+    Updater::Const("pitchFreqModAftertouchJoystick", 0),
+    Updater::Sweep("vdfCutoff", 20, 80),
+    Updater::Const("vdfCutoffKeybTrackKey", 64),
+    Updater::Const("vdfCutoffKeybTrackIntensity", 64),
+    Updater::Sweep("vdfEgIntensity", 20, 99),
+    Updater::Const("vdfEgTimeKeybTrack", 50),
+    Updater::Const("vdfEgTimeVelocitySens", 20),
+    Updater::Const("vdfEgIntensityVelocitySens", 70),
+    Updater::Sweep("env_filter_attackTime", 1, 10),
+    Updater::Sweep("env_filter_attackLevel", -90, 90),
+    Updater::Sweep("env_filter_decayTime", ENV_TIME_LOW, ENV_TIME_HIGH),
+    Updater::Sweep("env_filter_breakPoint", -90, 90),
+    Updater::Sweep("env_filter_slopeTime", ENV_TIME_LOW, ENV_TIME_HIGH),
+    Updater::Sweep("env_filter_sustainLevel", -90, 90),
+    Updater::Sweep("env_filter_releaseTime", 30, 60),
+    Updater::Sweep("env_filter_releaseLevel", -90, 90),
+    Updater::Sweep("vol", 0, 99), // needs to be paired
+    Updater::Const("oscKeybTrackKey", 0),
+    Updater::Const("amplKeybTrackKeyIntensity", 0),
+    Updater::Const("amplVelocitySens", 11),
+    Updater::Const("amplEgTimeKeybTrack", 50),
+    Updater::Const("amplEgTimeVelocitySens", 10),
+    Updater::Sweep("env_amplitude_attackTime", 1, 10),
+    Updater::Sweep("env_amplitude_attackLevel", 40, 90),
+    Updater::Sweep("env_amplitude_decayTime", ENV_TIME_LOW, ENV_TIME_HIGH),
+    Updater::Sweep("env_amplitude_breakPoint", 40, 90),
+    Updater::Sweep("env_amplitude_slopeTime", 5, 60),
+    Updater::Sweep("env_amplitude_sustainLevel", 40, 90),
+    Updater::Sweep("env_amplitude_releaseTime", 5, 80),
+    Updater::Const("freq_EgTimeKeybTrackSwitchPolarity", 0),
+    Updater::Const("freq_EgTimeVelocitySwitchPolarity", 0),
+    Updater::Const("ampl_EgTimeKeybTrackSwitchPolarity", 0),
+    Updater::Const("ampl_EgTimeVelocitySwitchPolarity", 0),
+    Updater::Const("cdSend", 0), // ConstProgSetting< 0x99 > m_cdSend2( "cdSend2", g_osc2Settings ); ... Paired??
+    Updater::Sweep("filterQ", 40, 99)
 ];
-
-
 
 
 fn note_test(midi_out: &mut MidiOut, prg: u8) {
@@ -121,7 +164,7 @@ fn update<'a>(kpsx: &mut KorgProgramSysEx,
                 let state_val = sweep_state.entry(s).or_insert(SweepState { val: *max, freq_hz: 0.05 });
                 let dt = start.elapsed().as_millis() as f32;
                 let ang_freq = state_val.freq_hz * 2.0 * f32::consts::PI as f32;
-                let new_val = (*min as f32 + ((*max - *min) as f32 * 0.5 * (1.0 + (dt * 0.001 * ang_freq).cos()))).round() as i8;
+                let new_val = (*min as f32 + ((*max as f32 - *min as f32) * 0.5 * (1.0 + (dt * 0.001 * ang_freq).cos()))).round() as i8;
                 *state_val = SweepState { val: new_val, freq_hz: 0.05 };
                 kpsx.data(new_val);
             },
@@ -149,7 +192,6 @@ fn main() {
     MidiOutDevices::list();
 
     let mut midi_out = MidiOut::using_device(2);
-    note_test(&mut midi_out, 28);
 
     midi_out.send(&MidiMessage::program(33, CHANNEL));
     thread::sleep(Duration::from_millis(100));
@@ -181,4 +223,5 @@ fn main() {
                     .expect("Failed to open port");
 
     port.write(&kpsx.data).expect("Write failed!");
+    note_test(&mut midi_out, 33);
 }
