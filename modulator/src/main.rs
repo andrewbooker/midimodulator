@@ -80,10 +80,7 @@ const OSC_SPEC: [Updater; 2] = [
     Updater::Const("pitchWaveform", 0) // bits 1-4 = waveform, bit7=key sync)
 ];
 
-struct SweepState {
-    val: i8,
-    freq_hz: f32
-}
+
 
 
 fn note_test(midi_out: &mut MidiOut, prg: u8) {
@@ -101,19 +98,26 @@ fn note_test(midi_out: &mut MidiOut, prg: u8) {
     thread::sleep(Duration::from_millis(1000));
 }
 
+struct SweepState {
+    val: i8,
+    freq_hz: f32
+}
 
 fn update<'a>(kpsx: &mut KorgProgramSysEx,
-              sweep_state: &mut HashMap::<&'a str, SweepState>,
-              selector_state: &mut HashMap::<&'a str, i16>,
+              sweep_state: &mut HashMap::<String, SweepState>,
+              selector_state: &mut HashMap::<String, i16>,
               updaters: &'a [Updater],
-              start: &Instant)
+              start: &Instant,
+              prefix: Option<&str>)
 {
     for u in updaters {
         match u {
             Updater::Const(_, c) => {
                 kpsx.data(*c);
             },
-            Updater::Sweep(s, min, max) => {
+            Updater::Sweep(key, min, max) => {
+                let s = if prefix.is_none() { String::from(*key) } else { [prefix.unwrap(), *key].join("_") };
+
                 let state_val = sweep_state.entry(s).or_insert(SweepState { val: *max, freq_hz: 0.05 });
                 let dt = start.elapsed().as_millis() as f32;
                 let ang_freq = state_val.freq_hz * 2.0 * f32::consts::PI as f32;
@@ -121,9 +125,12 @@ fn update<'a>(kpsx: &mut KorgProgramSysEx,
                 *state_val = SweepState { val: new_val, freq_hz: 0.05 };
                 kpsx.data(new_val);
             },
-            Updater::SelectOnZero(s, watching, double_byte) => {
+            Updater::SelectOnZero(key, watching, double_byte) => {
+                let s = if prefix.is_none() { String::from(*key) } else { [prefix.unwrap(), *key].join("_") };
+                let w = String::from(*watching);
+
                 let state_val = selector_state.entry(s).or_insert(9);
-                if sweep_state.contains_key(watching) && sweep_state.get(watching).unwrap().val == 0 {
+                if sweep_state.contains_key(&w) && sweep_state.get(&w).unwrap().val == 0 {
                     *state_val = 99;
                 }
                 if *double_byte { kpsx.data_double_byte(*state_val) } else { kpsx.data(*state_val as i8) };
@@ -134,8 +141,8 @@ fn update<'a>(kpsx: &mut KorgProgramSysEx,
 
 
 fn main() {
-    let mut sweep_state = HashMap::<&str, SweepState>::new();
-    let mut selector_state = HashMap::<&str, i16>::new();
+    let mut sweep_state = HashMap::<String, SweepState>::new();
+    let mut selector_state = HashMap::<String, i16>::new();
 
     let start = Instant::now();
 
@@ -154,7 +161,8 @@ fn main() {
     let mut kpsx = KorgProgramSysEx::new();
     kpsx.name("2021-01-05");
 
-    update(&mut kpsx, &mut sweep_state, &mut selector_state, &PROGRAM_SPEC, &start);
+    update(&mut kpsx, &mut sweep_state, &mut selector_state, &PROGRAM_SPEC, &start, None);
+    update(&mut kpsx, &mut sweep_state, &mut selector_state, &OSC_SPEC, &start, Some("osc1"));
 
     for (key, val) in &sweep_state {
         println!("{}: {}", key, val.val);
