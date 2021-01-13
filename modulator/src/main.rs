@@ -75,6 +75,11 @@ const PROGRAM_SPEC: [Updater; 28] = [
     Updater::Const("joystickVdfModulationIntensity", 0)
 ];
 
+const OSC_SPEC: [Updater; 2] = [
+    Updater::Sweep("pitchEgIntensity", 1, 20),
+    Updater::Const("pitchWaveform", 0) // bits 1-4 = waveform, bit7=key sync)
+];
+
 struct SweepState {
     val: i8,
     freq_hz: f32
@@ -94,6 +99,37 @@ fn note_test(midi_out: &mut MidiOut, prg: u8) {
     thread::sleep(Duration::from_millis(2000));
     midi_out.send(&off);
     thread::sleep(Duration::from_millis(1000));
+}
+
+
+fn update<'a>(kpsx: &mut KorgProgramSysEx,
+              sweep_state: &mut HashMap::<&'a str, SweepState>,
+              selector_state: &mut HashMap::<&'a str, i16>,
+              updaters: &'a [Updater],
+              start: &Instant)
+{
+    for u in updaters {
+        match u {
+            Updater::Const(_, c) => {
+                kpsx.data(*c);
+            },
+            Updater::Sweep(s, min, max) => {
+                let state_val = sweep_state.entry(s).or_insert(SweepState { val: *max, freq_hz: 0.05 });
+                let dt = start.elapsed().as_millis() as f32;
+                let ang_freq = state_val.freq_hz * 2.0 * f32::consts::PI as f32;
+                let new_val = (*min as f32 + ((*max - *min) as f32 * 0.5 * (1.0 + (dt * 0.001 * ang_freq).cos()))).round() as i8;
+                *state_val = SweepState { val: new_val, freq_hz: 0.05 };
+                kpsx.data(new_val);
+            },
+            Updater::SelectOnZero(s, watching, double_byte) => {
+                let state_val = selector_state.entry(s).or_insert(9);
+                if sweep_state.contains_key(watching) && sweep_state.get(watching).unwrap().val == 0 {
+                    *state_val = 99;
+                }
+                if *double_byte { kpsx.data_double_byte(*state_val) } else { kpsx.data(*state_val as i8) };
+            }
+        }
+    }
 }
 
 
@@ -118,28 +154,7 @@ fn main() {
     let mut kpsx = KorgProgramSysEx::new();
     kpsx.name("2021-01-05");
 
-    for u in &PROGRAM_SPEC {
-        match u {
-            Updater::Const(_, c) => {
-                kpsx.data(*c);
-            },
-            Updater::Sweep(s, min, max) => {
-                let state_val = sweep_state.entry(s).or_insert(SweepState { val: *max, freq_hz: 0.05 });
-                let dt = start.elapsed().as_millis() as f32;
-                let ang_freq = state_val.freq_hz * 2.0 * f32::consts::PI as f32;
-                let new_val = (*min as f32 + ((*max - *min) as f32 * 0.5 * (1.0 + (dt * 0.001 * ang_freq).cos()))).round() as i8;
-                *state_val = SweepState { val: new_val, freq_hz: 0.05 };
-                kpsx.data(new_val);
-            },
-            Updater::SelectOnZero(s, watching, double_byte) => {
-                let state_val = selector_state.entry(s).or_insert(9);
-                if sweep_state.contains_key(watching) && sweep_state.get(watching).unwrap().val == 0 {
-                    *state_val = 99;
-                }
-                if *double_byte { kpsx.data_double_byte(*state_val) } else { kpsx.data(*state_val as i8) };
-            }
-        }
-    }
+    update(&mut kpsx, &mut sweep_state, &mut selector_state, &PROGRAM_SPEC, &start);
 
     for (key, val) in &sweep_state {
         println!("{}: {}", key, val.val);
