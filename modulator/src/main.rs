@@ -41,7 +41,7 @@ enum Updater<'a> {
     SelectOnZero(&'a str, &'a str, bool)
 }
 
-const PROGRAM_SPEC: [Updater; 15] = [
+const PROGRAM_SPEC: [Updater; 28] = [
     Updater::Const("oscillatorMode", 1),
     Updater::Const("noteMode", 0),
     Updater::SelectOnZero("osc1", "vol1", true),
@@ -57,7 +57,22 @@ const PROGRAM_SPEC: [Updater; 15] = [
     Updater::Sweep("env_pitch_attackLevel", -7, 7),
     Updater::Sweep("env_pitch_decayTime", 10, 30),
     Updater::Sweep("env_pitch_releaseTime", 10, 30),
-    Updater::Sweep("env_pitch_releaseLevel", -8, 0)
+    Updater::Sweep("env_pitch_releaseLevel", -8, 0),
+
+    Updater::Const("pitchEgTimeVelocitySens", 0),
+    Updater::Const("pitchEgLevelVelocitySens", 0),
+    Updater::Const("cutoffTypeDetails", 0),  // cutoff type (bits 1-4 = waveform 0=TRI, bit5=osc1 enable, bit6=osc2 enable, bit7=key sync)
+    Updater::Sweep("modFreq", 20, 99),
+    Updater::Sweep("modDelay", 1, 40),
+    Updater::Sweep("modIntensity", 1, 40),
+
+    Updater::Const("pitchBendRange", 0),
+    Updater::Const("vdfCutoff", 0),
+    Updater::Const("vdfModulationIntensity", 0),
+    Updater::Const("vdaAmplitude", 0),
+    Updater::Const("joystickPitchBendRange", 0),
+    Updater::Const("joystickVdfSweepIntensity", 0),
+    Updater::Const("joystickVdfModulationIntensity", 0)
 ];
 
 struct SweepState {
