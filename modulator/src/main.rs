@@ -7,109 +7,13 @@ use crate::midi::{MidiMessage, MidiOut, MidiOutDevices};
 use std::{
     f32,
     thread,
-    time::{Duration, Instant}
+    time::{Duration, Instant},
+    collections::HashMap
 };
 
 
-struct ConstParam {
-    val: i8
-}
-
-struct SweepableParam {
-    max_val: i8,
-    min_val: i8
-}
-
 const OSCILLATORS: [i16; 11] = [0,1,2,3,4,5,6,7,8,9,10];
-const OSCILLATOR_MODE: ConstParam = ConstParam{ val: 1 };
-const NOTE_MODE: ConstParam = ConstParam{ val: 0 };
-const NOTE_REGISTER: ConstParam = ConstParam{ val: 0 };
-const INTERVAL: ConstParam = ConstParam{ val: 0 };
 
-const DETUNE: SweepableParam = SweepableParam { min_val: -17, max_val: 17 };
-const VOLUME: SweepableParam = SweepableParam { min_val: 0, max_val: 99 };
-
-
-struct Sweeper<'a> {
-    original: &'a SweepableParam,
-    freq_hz: f32,
-    previous_val: i8,
-    current_val: i8
-}
-
-impl Sweeper<'_> {
-    fn new<'a>(f_hz: f32, p: &'a SweepableParam) -> Sweeper<'a> {
-        Sweeper {
-            freq_hz: f_hz,
-            original: p,
-            current_val: p.max_val,
-            previous_val: p.max_val
-        }
-    }
-
-    fn update(&mut self, since_start: &Instant) {
-        let dt = since_start.elapsed().as_millis() as f32;
-        let ang_freq = self.freq_hz * 2.0 * f32::consts::PI as f32;
-
-        self.previous_val = self.current_val;
-        let val = self.original.min_val as f32 + ((self.original.max_val - self.original.min_val) as f32 * 0.5 * (1.0 + (dt * 0.001 * ang_freq).cos()));
-        self.current_val = val.round() as i8;
-    }
-}
-
-struct Selector<'b> {
-    options: &'b[i16],
-    current_val: i16
-}
-
-impl Selector<'_> {
-    fn new<'b>(opts: &'b[i16]) -> Selector<'b> {
-        Selector {
-            options: opts,
-            current_val: opts[0] // should select anything from options.
-        }
-    }
-    fn update<'b>(&mut self, sweeper: &'b Sweeper) {
-        if sweeper.current_val == 0 {
-            self.current_val = self.options[2];
-        }
-    }
-}
-
-
-trait SyxExAppender {
-    fn append_to(&self, psx: &mut KorgProgramSysEx);
-}
-
-impl SyxExAppender for ConstParam {
-    fn append_to(&self, psx: &mut KorgProgramSysEx) {
-        psx.data(self.val);
-    }
-}
-
-impl SyxExAppender for Sweeper<'_> {
-    fn append_to(&self, psx: &mut KorgProgramSysEx) {
-        psx.data(self.current_val);
-    }
-}
-
-impl SyxExAppender for Selector<'_> { // so far only good for Oscillators as they are i16
-    fn append_to(&self, psx: &mut KorgProgramSysEx) {
-        psx.data_double_byte(self.current_val);
-    }
-}
-
-fn build_prog_sys_ex(psx: &mut KorgProgramSysEx, osc1: &dyn SyxExAppender, osc2: &dyn SyxExAppender, detune: &dyn SyxExAppender) {
-    psx.name("2021-01-05");
-    OSCILLATOR_MODE.append_to(psx);
-    NOTE_MODE.append_to(psx);
-    osc1.append_to(psx);
-    NOTE_REGISTER.append_to(psx);
-    osc1.append_to(psx);
-    NOTE_REGISTER.append_to(psx);
-    INTERVAL.append_to(psx);
-    detune.append_to(psx);
-}
 
 struct KorgInitSysEx {
     data: [u8; 8]
@@ -131,23 +35,32 @@ impl KorgInitSysEx {
 }
 
 
-fn main() {
-    let start = Instant::now();
-    let mut detune = Sweeper::new(0.05, &DETUNE);
-    let mut vol1 = Sweeper::new(0.04, &VOLUME);
-    let mut vol2 = Sweeper::new(0.04, &VOLUME);
-    let mut osc1 = Selector::new(&OSCILLATORS);
-    let mut osc2 = Selector::new(&OSCILLATORS);
+enum Updater<'a> {
+    Const(&'a str, i8),
+    Sweep(&'a str, i8, i8),
+    SelectOnZero(&'a str, &'a str, bool)
+}
 
-    for i in 0..10 {
-        detune.update(&start);
-        println!("{} {} {}", i, detune.current_val, detune.previous_val);
-        vol1.update(&start);
-        vol2.update(&start);
-        osc1.update(&vol1);
-        osc2.update(&vol2);
-        thread::sleep(Duration::from_millis(100));
-    }
+
+struct SweepState {
+    val: i8,
+    freq_hz: f32
+}
+
+
+fn main() {
+    let progam_spec = [Updater::Const("oscillatorMode", 1),
+                       Updater::Const("noteMode", 0),
+                       Updater::SelectOnZero("osc1", "vol1", true),
+                       Updater::Const("osc1Register", 0),
+                       Updater::SelectOnZero("osc2", "vol2", true),
+                       Updater::Const("osc2Register", 0),
+                       Updater::Sweep("detune", -17, 17)];
+
+    let mut sweep_state = HashMap::<&str, SweepState>::new();
+    let mut selector_state = HashMap::<&str, i16>::new();
+
+    let start = Instant::now();
 
     MidiOutDevices::list();
 
@@ -174,7 +87,30 @@ fn main() {
     thread::sleep(Duration::from_millis(100));
 
     let mut kpsx = KorgProgramSysEx::new();
-    build_prog_sys_ex(&mut kpsx, &osc1, &osc2, &detune);
+    kpsx.name("2021-01-05");
+
+    for u in &progam_spec {
+        match u {
+            Updater::Const(_, c) => {
+                kpsx.data(*c);
+            },
+            Updater::Sweep(s, min, max) => {
+                let state_val = sweep_state.entry(s).or_insert(SweepState { val: *max, freq_hz: 0.05 });
+                let dt = start.elapsed().as_millis() as f32;
+                let ang_freq = state_val.freq_hz * 2.0 * f32::consts::PI as f32;
+                let new_val = (*min as f32 + ((*max - *min) as f32 * 0.5 * (1.0 + (dt * 0.001 * ang_freq).cos()))).round() as i8;
+                *state_val = SweepState { val: new_val, freq_hz: 0.05 };
+                kpsx.data(new_val);
+            },
+            Updater::SelectOnZero(s, watching, double_byte) => {
+                let state_val = selector_state.entry(s).or_insert(9);
+                if sweep_state.contains_key(watching) && sweep_state.get(watching).unwrap().val == 0 {
+                    *state_val = 99;
+                }
+                if *double_byte { kpsx.data_double_byte(*state_val) } else { kpsx.data(*state_val as i8) };
+            }
+        }
+    }
 
     let ports = serialport::available_ports().expect("No ports found!");
     for p in ports {
