@@ -41,6 +41,24 @@ enum Updater<'a> {
     SelectOnZero(&'a str, &'a str, bool)
 }
 
+const PROGRAM_SPEC: [Updater; 15] = [
+    Updater::Const("oscillatorMode", 1),
+    Updater::Const("noteMode", 0),
+    Updater::SelectOnZero("osc1", "vol1", true),
+    Updater::Const("osc1Register", 0),
+    Updater::SelectOnZero("osc2", "vol2", true),
+    Updater::Const("osc2Register", 0),
+    Updater::Const("octave", 0),
+    Updater::Sweep("detune", -17, 17),
+    Updater::Const("delay", 0),
+
+    Updater::Const("env_pitch_startLevel", 0),
+    Updater::Sweep("env_pitch_attackTime", 1, 4),
+    Updater::Sweep("env_pitch_attackLevel", -7, 7),
+    Updater::Sweep("env_pitch_decayTime", 10, 30),
+    Updater::Sweep("env_pitch_releaseTime", 10, 30),
+    Updater::Sweep("env_pitch_releaseLevel", -8, 0)
+];
 
 struct SweepState {
     val: i8,
@@ -48,25 +66,8 @@ struct SweepState {
 }
 
 
-fn main() {
-    let progam_spec = [Updater::Const("oscillatorMode", 1),
-                       Updater::Const("noteMode", 0),
-                       Updater::SelectOnZero("osc1", "vol1", true),
-                       Updater::Const("osc1Register", 0),
-                       Updater::SelectOnZero("osc2", "vol2", true),
-                       Updater::Const("osc2Register", 0),
-                       Updater::Sweep("detune", -17, 17)];
-
-    let mut sweep_state = HashMap::<&str, SweepState>::new();
-    let mut selector_state = HashMap::<&str, i16>::new();
-
-    let start = Instant::now();
-
-    MidiOutDevices::list();
-
-    let mut midi_out = MidiOut::using_device(2);
-
-    let prog28 = MidiMessage::program(28, CHANNEL);
+fn note_test(midi_out: &mut MidiOut, prg: u8) {
+    let prog28 = MidiMessage::program(prg, CHANNEL);
     midi_out.send(&prog28);
     thread::sleep(Duration::from_millis(1000));
 
@@ -78,6 +79,19 @@ fn main() {
     thread::sleep(Duration::from_millis(2000));
     midi_out.send(&off);
     thread::sleep(Duration::from_millis(1000));
+}
+
+
+fn main() {
+    let mut sweep_state = HashMap::<&str, SweepState>::new();
+    let mut selector_state = HashMap::<&str, i16>::new();
+
+    let start = Instant::now();
+
+    MidiOutDevices::list();
+
+    let mut midi_out = MidiOut::using_device(2);
+    note_test(&mut midi_out, 28);
 
     midi_out.send(&MidiMessage::program(33, CHANNEL));
     thread::sleep(Duration::from_millis(100));
@@ -89,7 +103,7 @@ fn main() {
     let mut kpsx = KorgProgramSysEx::new();
     kpsx.name("2021-01-05");
 
-    for u in &progam_spec {
+    for u in &PROGRAM_SPEC {
         match u {
             Updater::Const(_, c) => {
                 kpsx.data(*c);
@@ -110,6 +124,13 @@ fn main() {
                 if *double_byte { kpsx.data_double_byte(*state_val) } else { kpsx.data(*state_val as i8) };
             }
         }
+    }
+
+    for (key, val) in &sweep_state {
+        println!("{}: {}", key, val.val);
+    }
+    for (key, val) in &selector_state {
+        println!("{}: {}", key, val);
     }
 
     let ports = serialport::available_ports().expect("No ports found!");
