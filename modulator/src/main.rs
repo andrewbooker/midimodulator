@@ -79,7 +79,7 @@ const PROGRAM_SPEC: [Updater; 28] = [
     Updater::Const("joystickVdfModulationIntensity", 0)
 ];
 
-const OSC_SPEC: [Updater; 44] = [
+const OSC_SPEC: [Updater; 47] = [
     Updater::Sweep("pitchEgIntensity", 1, 20),
     Updater::Const("pitchWaveform", 0), // bits 1-4 = waveform, bit7=key sync)
     Updater::Sweep("pitchEgFreq", 10, 50),
@@ -123,7 +123,10 @@ const OSC_SPEC: [Updater; 44] = [
     Updater::Const("ampl_EgTimeKeybTrackSwitchPolarity", 0),
     Updater::Const("ampl_EgTimeVelocitySwitchPolarity", 0),
     Updater::PairedInverseConst("cdSend", -103), // 0x99
-    Updater::Sweep("filterQ", 40, 99)
+    Updater::Sweep("filterQ", 40, 99),
+    Updater::Const("colourVelocitySens", 56),
+    Updater::Const("vdfVdaKeyboardTrackMode", 0),
+    Updater::Const("panCentre", 0x0F) // pan 0: A15, 0x0F: centre, 0x1E: B15
 ];
 
 const PRE_FX: [Updater; 10] = [
