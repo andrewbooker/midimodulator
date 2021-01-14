@@ -11,10 +11,7 @@ use std::{
     time::{Duration, Instant},
     collections::HashMap
 };
-use rand::random;
-
-
-const OSCILLATORS: [i16; 11] = [0,1,2,3,4,5,6,7,8,9,10];
+use rand::prelude::SliceRandom;
 
 
 struct KorgInitSysEx {
@@ -163,6 +160,11 @@ fn random_frequency() -> f32 {
     0.01 + (r / 100.0) as f32
 }
 
+const OSCILLATORS: [i16; 11] = [0,1,2,3,4,5,6,7,8,9,10];
+fn random_osc() -> i16 {
+    *OSCILLATORS.choose(&mut rand::thread_rng()).unwrap()
+}
+
 fn update<'a>(kpsx: &mut KorgProgramSysEx,
               sweep_state: &mut HashMap::<String, SweepState>,
               selector_state: &mut HashMap::<String, i16>,
@@ -215,9 +217,9 @@ fn update<'a>(kpsx: &mut KorgProgramSysEx,
                 let s = if prefix.is_none() { String::from(*key) } else { [prefix.unwrap(), *key].join("_") };
                 let w = String::from(*watching);
 
-                let state_val = selector_state.entry(s).or_insert(9);
+                let state_val = selector_state.entry(s).or_insert(random_osc());
                 if sweep_state.contains_key(&w) && sweep_state.get(&w).unwrap().val == 0 {
-                    *state_val = 99;
+                    *state_val = random_osc();
                 }
                 if *double_byte { kpsx.data_double_byte(*state_val) } else { kpsx.data(*state_val as i8) };
             }
