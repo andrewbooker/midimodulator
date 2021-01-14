@@ -1,15 +1,17 @@
 extern crate libc;
+
 mod korg;
 mod midi;
+
 use crate::korg::{CHANNEL, KorgProgramSysEx};
 use crate::midi::{MidiMessage, MidiOut, MidiOutDevices};
-
 use std::{
     f32,
     thread,
     time::{Duration, Instant},
     collections::HashMap
 };
+use rand::random;
 
 
 const OSCILLATORS: [i16; 11] = [0,1,2,3,4,5,6,7,8,9,10];
@@ -148,12 +150,17 @@ fn note_test(midi_out: &mut MidiOut, note: u8) {
     midi_out.send(&on);
     thread::sleep(Duration::from_millis(2000));
     midi_out.send(&off);
-    thread::sleep(Duration::from_millis(1000));
+    thread::sleep(Duration::from_millis(100));
 }
 
 struct SweepState {
     val: i8,
     freq_hz: f32
+}
+
+fn random_frequency() -> f32 {
+    let r = rand::random::<f64>();
+    0.01 + (r / 100.0) as f32
 }
 
 fn update<'a>(kpsx: &mut KorgProgramSysEx,
@@ -173,18 +180,20 @@ fn update<'a>(kpsx: &mut KorgProgramSysEx,
                 kpsx.data(if inverse { *c } else { 0 });
             },
             Updater::Sweep(key, min, max) => {
+                let freq_hz = random_frequency();
                 let s = if prefix.is_none() { String::from(*key) } else { [prefix.unwrap(), *key].join("_") };
 
-                let state_val = sweep_state.entry(s).or_insert(SweepState { val: *max, freq_hz: 0.05 });
+                let state_val = sweep_state.entry(s).or_insert(SweepState { val: *max, freq_hz: freq_hz });
                 let dt = start.elapsed().as_millis() as f32;
                 let ang_freq = state_val.freq_hz * 2.0 * f32::consts::PI as f32;
                 let new_val = (*min as f32 + ((*max as f32 - *min as f32) * 0.5 * (1.0 + (dt * 0.001 * ang_freq).cos()))).round() as i8;
-                *state_val = SweepState { val: new_val, freq_hz: 0.05 };
+                *state_val = SweepState { val: new_val, freq_hz: state_val.freq_hz };
                 kpsx.data(new_val);
             },
             Updater::PairedInverseSweep(key, max) => {
+                let vol_freq_hz = random_frequency();
                 let s = String::from(*key);
-                let state_val = sweep_state.entry(s).or_insert(SweepState { val: *max, freq_hz: 0.05 });
+                let state_val = sweep_state.entry(s).or_insert(SweepState { val: *max, freq_hz: vol_freq_hz });
 
                 let inverse = '2' == prefix.unwrap().chars().last().unwrap();
                 let sk = [prefix.unwrap(), *key].join("_");
@@ -197,7 +206,7 @@ fn update<'a>(kpsx: &mut KorgProgramSysEx,
                     let dt = start.elapsed().as_millis() as f32;
                     let ang_freq = state_val.freq_hz * 2.0 * f32::consts::PI as f32;
                     let new_val = (*max as f32 * 0.5 * (1.0 + (dt * 0.001 * ang_freq).cos())).round() as i8;
-                    *state_val = SweepState { val: new_val, freq_hz: 0.05 };
+                    *state_val = SweepState { val: new_val, freq_hz: state_val.freq_hz };
                     sweep_state.entry(sk).or_insert(SweepState { val: new_val, freq_hz: 0.0 });
                     kpsx.data(new_val);
                 }
