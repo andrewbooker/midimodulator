@@ -9,7 +9,8 @@ use std::{
     f32,
     thread,
     time::{Duration, Instant},
-    collections::HashMap
+    collections::HashMap,
+    sync::mpsc
 };
 use rand::prelude::SliceRandom;
 
@@ -158,6 +159,12 @@ struct SweepState {
     freq_hz: f32
 }
 
+impl Clone for SweepState {
+    fn clone(&self) -> Self {
+        SweepState { val: self.val, freq_hz: self.freq_hz }
+    }
+}
+
 fn random_frequency() -> f32 {
     let r = rand::random::<f64>();
     0.01 + (r / 100.0) as f32
@@ -251,7 +258,10 @@ fn main() {
         println!("{}", p.port_name);
     }
 
-    thread::spawn(|| {
+    let (cmd_tx, cmd_rx) = mpsc::channel();
+    let (res_tx, res_rx) = mpsc::channel();
+
+    thread::spawn(move || {
         let mut port = serialport::new("/dev/ttyUSB0", 38400)
                     .timeout(Duration::from_millis(1000))
                     .open()
@@ -273,6 +283,28 @@ fn main() {
 
             port.write(&kpsx.data).expect("Write failed!");
             thread::sleep(Duration::from_millis(100));
+
+            match cmd_rx.try_recv() {
+                Ok(_) => {
+                    res_tx.send(sweep_state.clone()).unwrap();
+                },
+                _ => {}
+            }
+        }
+    });
+
+    thread::spawn(move || {
+        let g = getch::Getch::new();
+        loop {
+            let c: u8 = g.getch().unwrap();
+            if c == 'l' as u8 {
+                cmd_tx.send(()).unwrap();
+                for res in &res_rx {
+                    for (key, val) in &res {
+                        println!("{}: {}", key, val.val);
+                    }
+                }
+            }
         }
     });
 
