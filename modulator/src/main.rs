@@ -127,6 +127,19 @@ const OSC_SPEC: [Updater; 44] = [
     Updater::Sweep("filterQ", 40, 99)
 ];
 
+const PRE_FX: [Updater; 10] = [
+    Updater::Const("", 0),
+    Updater::Const("eff1_number", 0),
+    Updater::Const("eff2_number", 0),
+    Updater::Const("eff1_level_A", 0),
+    Updater::Const("eff1_level_B", 0),
+    Updater::Const("eff2_level_C", 0),
+    Updater::Const("eff2_level_D", 0),
+    Updater::Const("pan3", 101),
+    Updater::Const("pan4", 1),
+    Updater::Const("eff_routing", 0x10 | 0x0F) // routing | enable
+];
+
 
 fn note_test(midi_out: &mut MidiOut, note: u8) {
     let on = MidiMessage::note_on(note, CHANNEL);
@@ -242,6 +255,7 @@ fn main() {
             update(&mut kpsx, &mut sweep_state, &mut selector_state, &PROGRAM_SPEC, &start, None);
             update(&mut kpsx, &mut sweep_state, &mut selector_state, &OSC_SPEC, &start, Some("osc1"));
             update(&mut kpsx, &mut sweep_state, &mut selector_state, &OSC_SPEC, &start, Some("osc2"));
+            update(&mut kpsx, &mut sweep_state, &mut selector_state, &PRE_FX, &start, None);
 
             port.write(&kpsx.data).expect("Write failed!");
             thread::sleep(Duration::from_millis(100));
