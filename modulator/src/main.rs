@@ -37,8 +37,9 @@ impl KorgInitSysEx {
 
 enum Updater<'a> {
     Const(&'a str, i8),
+    PairedInverseConst(&'a str, i8),
     Sweep(&'a str, i8, i8),
-    PairedSweep(&'a str),
+    PairedInverseSweep(&'a str, i8),
     SelectOnZero(&'a str, &'a str, bool)
 }
 
@@ -105,7 +106,7 @@ const OSC_SPEC: [Updater; 44] = [
     Updater::Sweep("env_filter_sustainLevel", -90, 90),
     Updater::Sweep("env_filter_releaseTime", 30, 60),
     Updater::Sweep("env_filter_releaseLevel", -90, 90),
-    Updater::PairedSweep("vol"),
+    Updater::PairedInverseSweep("vol", 99),
     Updater::Const("oscKeybTrackKey", 0),
     Updater::Const("amplKeybTrackKeyIntensity", 0),
     Updater::Const("amplVelocitySens", 11),
@@ -122,7 +123,7 @@ const OSC_SPEC: [Updater; 44] = [
     Updater::Const("freq_EgTimeVelocitySwitchPolarity", 0),
     Updater::Const("ampl_EgTimeKeybTrackSwitchPolarity", 0),
     Updater::Const("ampl_EgTimeVelocitySwitchPolarity", 0),
-    Updater::Const("cdSend", 0), // ConstProgSetting< 0x99 > m_cdSend2( "cdSend2", g_osc2Settings ); ... Paired??
+    Updater::PairedInverseConst("cdSend", -103), // 0x99
     Updater::Sweep("filterQ", 40, 99)
 ];
 
@@ -154,6 +155,10 @@ fn update<'a>(kpsx: &mut KorgProgramSysEx,
             Updater::Const(_, c) => {
                 kpsx.data(*c);
             },
+            Updater::PairedInverseConst(_, c) => {
+                let inverse = '2' == prefix.unwrap().chars().last().unwrap();
+                kpsx.data(if inverse { *c } else { 0 });
+            },
             Updater::Sweep(key, min, max) => {
                 let s = if prefix.is_none() { String::from(*key) } else { [prefix.unwrap(), *key].join("_") };
 
@@ -164,9 +169,9 @@ fn update<'a>(kpsx: &mut KorgProgramSysEx,
                 *state_val = SweepState { val: new_val, freq_hz: 0.05 };
                 kpsx.data(new_val);
             },
-            Updater::PairedSweep(key) => {
+            Updater::PairedInverseSweep(key, max) => {
                 let s = String::from(*key);
-                let state_val = sweep_state.entry(s).or_insert(SweepState { val: 99, freq_hz: 0.05 });
+                let state_val = sweep_state.entry(s).or_insert(SweepState { val: *max, freq_hz: 0.05 });
 
                 let inverse = '2' == prefix.unwrap().chars().last().unwrap();
                 let sk = [prefix.unwrap(), *key].join("_");
@@ -178,7 +183,7 @@ fn update<'a>(kpsx: &mut KorgProgramSysEx,
                     // as sweep
                     let dt = start.elapsed().as_millis() as f32;
                     let ang_freq = state_val.freq_hz * 2.0 * f32::consts::PI as f32;
-                    let new_val = (99.0 * 0.5 * (1.0 + (dt * 0.001 * ang_freq).cos())).round() as i8;
+                    let new_val = (*max as f32 * 0.5 * (1.0 + (dt * 0.001 * ang_freq).cos())).round() as i8;
                     *state_val = SweepState { val: new_val, freq_hz: 0.05 };
                     sweep_state.entry(sk).or_insert(SweepState { val: new_val, freq_hz: 0.0 });
                     kpsx.data(new_val);
@@ -246,4 +251,5 @@ fn main() {
     for n in 0..14 {
         note_test(&mut midi_out, 50 + (2 * n));
     }
+    thread::sleep(Duration::from_millis(2000));
 }
