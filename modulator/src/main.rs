@@ -127,12 +127,7 @@ const OSC_SPEC: [Updater; 44] = [
 ];
 
 
-fn note_test(midi_out: &mut MidiOut, prg: u8) {
-    let prog28 = MidiMessage::program(prg, CHANNEL);
-    midi_out.send(&prog28);
-    thread::sleep(Duration::from_millis(1000));
-
-    let note = 67;
+fn note_test(midi_out: &mut MidiOut, note: u8) {
     let on = MidiMessage::note_on(note, CHANNEL);
     let off = MidiMessage::note_off(note, CHANNEL);
 
@@ -205,11 +200,6 @@ fn update<'a>(kpsx: &mut KorgProgramSysEx,
 
 
 fn main() {
-    let mut sweep_state = HashMap::<String, SweepState>::new();
-    let mut selector_state = HashMap::<String, i16>::new();
-
-    let start = Instant::now();
-
     MidiOutDevices::list();
 
     let mut midi_out = MidiOut::using_device(2);
@@ -224,29 +214,36 @@ fn main() {
     midi_out.send_sys_ex(&kssx.data);
     thread::sleep(Duration::from_millis(100));
 
-    let mut kpsx = KorgProgramSysEx::new();
-    kpsx.name("2021-01-05");
-
-    update(&mut kpsx, &mut sweep_state, &mut selector_state, &PROGRAM_SPEC, &start, None);
-    update(&mut kpsx, &mut sweep_state, &mut selector_state, &OSC_SPEC, &start, Some("osc1"));
-    update(&mut kpsx, &mut sweep_state, &mut selector_state, &OSC_SPEC, &start, Some("osc2"));
-
-    for (key, val) in &sweep_state {
-        println!("{}: {}", key, val.val);
-    }
-    for (key, val) in &selector_state {
-        println!("{}: {}", key, val);
-    }
-
     let ports = serialport::available_ports().expect("No ports found!");
     for p in ports {
         println!("{}", p.port_name);
     }
-    let mut port = serialport::new("/dev/ttyUSB0", 38400)
+
+    thread::spawn(|| {
+        let mut port = serialport::new("/dev/ttyUSB0", 38400)
                     .timeout(Duration::from_millis(1000))
                     .open()
                     .expect("Failed to open port");
 
-    port.write(&kpsx.data).expect("Write failed!");
-    note_test(&mut midi_out, 33);
+        let mut sweep_state = HashMap::<String, SweepState>::new();
+        let mut selector_state = HashMap::<String, i16>::new();
+
+        let start = Instant::now();
+
+        loop {
+            let mut kpsx = KorgProgramSysEx::new();
+            kpsx.name("2021-01-13");
+
+            update(&mut kpsx, &mut sweep_state, &mut selector_state, &PROGRAM_SPEC, &start, None);
+            update(&mut kpsx, &mut sweep_state, &mut selector_state, &OSC_SPEC, &start, Some("osc1"));
+            update(&mut kpsx, &mut sweep_state, &mut selector_state, &OSC_SPEC, &start, Some("osc2"));
+
+            port.write(&kpsx.data).expect("Write failed!");
+            thread::sleep(Duration::from_millis(100));
+        }
+    });
+
+    for n in 0..14 {
+        note_test(&mut midi_out, 50 + (2 * n));
+    }
 }
