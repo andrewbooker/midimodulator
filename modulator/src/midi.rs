@@ -106,8 +106,7 @@ impl MidiOut {
     }
 
     pub fn send(&mut self, m: &MidiMessage) {
-        let res = unsafe { Pm_WriteShort(self.ostream, 0, m.as_u32()) };
-        println!("prog change {:x} gave {}", m.as_u32(), res as i32);
+        unsafe { Pm_WriteShort(self.ostream, 0, m.as_u32()) };
     }
 
     pub fn send_sys_ex(&mut self, data: &[u8]) {
