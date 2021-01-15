@@ -192,9 +192,53 @@ fn random_frequency() -> f32 {
     0.01 + (r / 100.0) as f32
 }
 
-const OSCILLATORS: [i16; 11] = [0,1,2,3,4,5,6,7,8,9,10];
+const OSCILLATOR_RANGES: [(i16, i16); 26] = [
+    (0, 10),
+    (11, 42),
+    (43, 59),
+    (61, 0),
+    (63, 0),
+    (70, 98),
+    (99, 105),
+    (106, 115),
+    (129, 0),
+    (132, 143),
+    (145, 153),
+    (155, 0),
+    (159, 0),
+    (161, 0),
+    (167, 170),
+    (171, 0),
+    (172, 173),
+    (175, 184),
+    (206, 207),
+    (209, 210),
+    (221, 226),
+    (252, 256),
+    (260, 0),
+    (268, 0),
+    (316, 333),
+    (335, 337)
+];
+
+
+fn expand(a: &[(i16, i16)]) -> Vec<i16> {
+    let mut ret = Vec::new();
+    for r in a {
+        if r.1 == 0 {
+            ret.push(r.0);
+        } else {
+            for _ in r.0..(r.1 + 1) {
+                ret.push(r.0);
+            }
+        }
+    }
+    ret
+}
+
+
 fn random_osc() -> i16 {
-    *OSCILLATORS.choose(&mut rand::thread_rng()).unwrap()
+    *expand(&OSCILLATOR_RANGES).choose(&mut rand::thread_rng()).unwrap()
 }
 
 fn update<'a>(kpsx: &mut KorgProgramSysEx,
