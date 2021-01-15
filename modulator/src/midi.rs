@@ -112,6 +112,7 @@ impl MidiOut {
     pub fn send_sys_ex(&mut self, data: &[u8]) {
         let res = unsafe { Pm_WriteSysEx(self.ostream, 0, data.as_ptr()) };
         println!("sys_ex: {}", res as i32);
+        thread::sleep(Duration::from_millis(100));
     }
 }
 

@@ -244,16 +244,18 @@ fn main() {
     MidiOutDevices::list();
 
     let mut midi_out = MidiOut::using_device(2);
-    let kssx = KorgInitSysEx::new(0x02); // select prog
-    midi_out.send_sys_ex(&kssx.data);
-    thread::sleep(Duration::from_millis(100));
+    {
+        let kssx = KorgInitSysEx::new(0x02); // select prog
+        midi_out.send_sys_ex(&kssx.data);
+    }
 
     midi_out.send(&MidiMessage::program(33, CHANNEL));
     thread::sleep(Duration::from_millis(100));
 
-    let kssx = KorgInitSysEx::new(0x03); // edit prog
-    midi_out.send_sys_ex(&kssx.data);
-    thread::sleep(Duration::from_millis(100));
+    {
+        let kssx = KorgInitSysEx::new(0x03); // edit prog
+        midi_out.send_sys_ex(&kssx.data);
+    }
 
     let ports = serialport::available_ports().expect("No ports found!");
     for p in ports {
@@ -308,6 +310,7 @@ fn main() {
                             println!("{}: {}", key, val.val);
                         }
                     }
+                    continue;
                 },
                 'q' => {
                     cmd_stop_tx.send(()).unwrap();
