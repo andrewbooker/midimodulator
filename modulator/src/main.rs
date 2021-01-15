@@ -113,7 +113,7 @@ const OSC_SPEC: [Updater; 47] = [
     Updater::Const("pitchModIntensityAftertouch", 0),
     Updater::Const("pitchModIntensityJoystick", 0),
     Updater::Const("pitchFreqModAftertouchJoystick", 0),
-    Updater::Sweep("vdfCutoff", 20, 80),
+    Updater::Sweep("vdfCutoff", 40, 80),
     Updater::Const("vdfCutoffKeybTrackKey", 64),
     Updater::Const("vdfCutoffKeybTrackIntensity", 64),
     Updater::Sweep("vdfEgIntensity", 20, 99),
@@ -121,11 +121,11 @@ const OSC_SPEC: [Updater; 47] = [
     Updater::Const("vdfEgTimeVelocitySens", 20),
     Updater::Const("vdfEgIntensityVelocitySens", 70),
     Updater::Sweep("env_filter_attackTime", 1, 10),
-    Updater::Sweep("env_filter_attackLevel", -90, 90),
+    Updater::Sweep("env_filter_attackLevel", -10, 90),
     Updater::Sweep("env_filter_decayTime", ENV_TIME_LOW, ENV_TIME_HIGH),
-    Updater::Sweep("env_filter_breakPoint", -90, 90),
+    Updater::Sweep("env_filter_breakPoint", -10, 90),
     Updater::Sweep("env_filter_slopeTime", ENV_TIME_LOW, ENV_TIME_HIGH),
-    Updater::Sweep("env_filter_sustainLevel", -90, 90),
+    Updater::Sweep("env_filter_sustainLevel", -30, 90),
     Updater::Sweep("env_filter_releaseTime", 30, 60),
     Updater::Sweep("env_filter_releaseLevel", -90, 90),
     Updater::PairedInverseSweep("vol", 99),
@@ -135,7 +135,7 @@ const OSC_SPEC: [Updater; 47] = [
     Updater::Const("amplEgTimeKeybTrack", 50),
     Updater::Const("amplEgTimeVelocitySens", 10),
     Updater::Sweep("env_amplitude_attackTime", 1, 10),
-    Updater::Sweep("env_amplitude_attackLevel", 40, 90),
+    Updater::Sweep("env_amplitude_attackLevel", 60, 80),
     Updater::Sweep("env_amplitude_decayTime", ENV_TIME_LOW, ENV_TIME_HIGH),
     Updater::Sweep("env_amplitude_breakPoint", 40, 90),
     Updater::Sweep("env_amplitude_slopeTime", 5, 60),
@@ -146,7 +146,7 @@ const OSC_SPEC: [Updater; 47] = [
     Updater::Const("ampl_EgTimeKeybTrackSwitchPolarity", 0),
     Updater::Const("ampl_EgTimeVelocitySwitchPolarity", 0),
     Updater::PairedInverseConst("cdSend", -103), // 0x99
-    Updater::Sweep("filterQ", 40, 99),
+    Updater::Sweep("filterQ", 20, 99),
     Updater::Const("colourVelocitySens", 56),
     Updater::Const("vdfVdaKeyboardTrackMode", 0),
     Updater::Const("panCentre", 0x0F) // pan 0: A15, 0x0F: centre, 0x1E: B15
@@ -336,8 +336,8 @@ fn main() {
                         for (key, val) in &res {
                             println!("{}: {}", key, val.val);
                         }
+                        break;
                     }
-                    continue;
                 },
                 'q' => {
                     cmd_stop_tx.send(()).unwrap();
