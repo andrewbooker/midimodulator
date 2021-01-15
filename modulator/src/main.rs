@@ -205,23 +205,25 @@ fn update<'a>(kpsx: &mut KorgProgramSysEx,
             Updater::PairedInverseSweep(key, max) => {
                 let vol_freq_hz = random_frequency();
                 let s = String::from(*key);
-                let state_val = sweep_state.entry(s).or_insert(SweepState { val: *max, freq_hz: vol_freq_hz });
-
-                let inverse = '2' == prefix.unwrap().chars().last().unwrap();
                 let sk = [prefix.unwrap(), *key].join("_");
-                if inverse {
-                    let new_val = 99 - state_val.val;
-                    sweep_state.entry(sk).or_insert(SweepState { val: new_val, freq_hz: 0.0 });
-                    kpsx.data(new_val);
-                } else {
+
+                let normal = '1' == prefix.unwrap().chars().last().unwrap();
+                let osc_vol;
+                if normal {
+                    let master_vol = sweep_state.entry(s).or_insert(SweepState { val: *max, freq_hz: vol_freq_hz });
+
                     // as sweep
                     let dt = start.elapsed().as_millis() as f32;
-                    let ang_freq = state_val.freq_hz * 2.0 * f32::consts::PI as f32;
-                    let new_val = (*max as f32 * 0.5 * (1.0 + (dt * 0.001 * ang_freq).cos())).round() as i8;
-                    *state_val = SweepState { val: new_val, freq_hz: state_val.freq_hz };
-                    sweep_state.entry(sk).or_insert(SweepState { val: new_val, freq_hz: 0.0 });
-                    kpsx.data(new_val);
+                    let ang_freq = master_vol.freq_hz * 2.0 * f32::consts::PI as f32;
+                    osc_vol = (*max as f32 * 0.5 * (1.0 + (dt * 0.001 * ang_freq).cos())).round() as i8;
+                    *master_vol = SweepState { val: osc_vol, freq_hz: master_vol.freq_hz };
+                } else {
+                    osc_vol = 99 - sweep_state.get(&s).unwrap().val;
                 }
+
+                let sk_state_val = sweep_state.entry(sk).or_insert(SweepState { val: osc_vol, freq_hz: 0.0 });
+                *sk_state_val = SweepState { val: osc_vol, freq_hz: 0.0 };
+                kpsx.data(osc_vol);
             },
             Updater::SelectOnZero(key, watching, double_byte) => {
                 let s = if prefix.is_none() { String::from(*key) } else { [prefix.unwrap(), *key].join("_") };
