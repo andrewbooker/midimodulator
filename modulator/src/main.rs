@@ -149,9 +149,9 @@ fn note_test(midi_out: &mut MidiOut, note: u8) {
     let off = MidiMessage::note_off(note, CHANNEL);
 
     midi_out.send(&on);
-    thread::sleep(Duration::from_millis(2000));
+    thread::sleep(Duration::from_millis(325));
     midi_out.send(&off);
-    thread::sleep(Duration::from_millis(100));
+    thread::sleep(Duration::from_millis(125));
 }
 
 struct SweepState {
@@ -260,7 +260,8 @@ fn main() {
         println!("{}", p.port_name);
     }
 
-    let (cmd_tx, cmd_rx) = mpsc::channel();
+    let (cmd_dump_tx, cmd_dump_rx) = mpsc::channel();
+    let (cmd_stop_tx, cmd_stop_rx) = mpsc::channel();
     let (res_tx, res_rx) = mpsc::channel();
 
     thread::spawn(move || {
@@ -286,7 +287,7 @@ fn main() {
             port.write(&kpsx.data).expect("Write failed!");
             thread::sleep(Duration::from_millis(100));
 
-            match cmd_rx.try_recv() {
+            match cmd_dump_rx.try_recv() {
                 Ok(_) => {
                     res_tx.send(sweep_state.clone()).unwrap();
                 },
@@ -299,19 +300,38 @@ fn main() {
         let g = getch::Getch::new();
         loop {
             let c: u8 = g.getch().unwrap();
-            if c == 'l' as u8 {
-                cmd_tx.send(()).unwrap();
-                for res in &res_rx {
-                    for (key, val) in &res {
-                        println!("{}: {}", key, val.val);
+            match c as char {
+                'l' => {
+                    cmd_dump_tx.send(()).unwrap();
+                    for res in &res_rx {
+                        for (key, val) in &res {
+                            println!("{}: {}", key, val.val);
+                        }
                     }
-                }
+                },
+                'q' => {
+                    cmd_stop_tx.send(()).unwrap();
+                    break;
+                },
+                _ => {}
             }
         }
     });
 
-    for n in 0..14 {
-        note_test(&mut midi_out, 50 + (2 * n));
+    let mut n = 0;
+    loop {
+        note_test(&mut midi_out, 40 + (2 * n));
+        n += 1;
+        if n > 20 {
+            n = 0;
+        }
+        match cmd_stop_rx.try_recv() {
+            Ok(_) => {
+                println!("stopping...");
+                break;
+            },
+            _ => {}
+        }
     }
     thread::sleep(Duration::from_millis(2000));
 }
