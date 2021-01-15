@@ -34,6 +34,28 @@ impl KorgInitSysEx {
     }
 }
 
+struct KorgSingleParamSysEx {
+    data: [u8; 10]
+}
+
+
+impl KorgSingleParamSysEx {
+    fn new(p: u8, v: u8) -> KorgSingleParamSysEx {
+        KorgSingleParamSysEx {
+            data: [0xF0,
+                   0x42, // ID of Korg
+                   0x30 | CHANNEL, // format ID (3), channel
+                   0x36, // 05R/W ID
+                   0x41, // parameter change
+                   p & 0x7F, // lsb parameter #
+                   (p >> 7) & 0x7F, // msb
+                   v & 0x7F, // lsb value
+                   (v >> 7) & 0x7F, // msb
+                   0xF7]
+        }
+    }
+}
+
 
 enum Updater<'a> {
     Const(&'a str, i8),
@@ -254,6 +276,11 @@ fn main() {
 
     {
         let kssx = KorgInitSysEx::new(0x03); // edit prog
+        midi_out.send_sys_ex(&kssx.data);
+    }
+
+    {
+        let kssx = KorgSingleParamSysEx::new(0, 1); // oscillator mode: Double, on UI, otherwise the screen value overrides th sysEx
         midi_out.send_sys_ex(&kssx.data);
     }
 
