@@ -2,7 +2,7 @@
 
 #[path = "../../lib/midi.rs"] mod midi;
 
-use crate::midi::{MidiMessage, MidiOut, MidiOutDevices};
+use crate::midi::{MidiMessage, MidiOut, MidiOutDevices, MidiIn, MidiInDevices};
 use std::{
     thread,
     time::Duration,
@@ -21,11 +21,23 @@ fn note_test(midi_out: &mut MidiOut, note: u8) {
     thread::sleep(Duration::from_millis(125));
 }
 
+fn note_read(midi_in: &mut MidiIn) {
+    midi_in.read();
+}
+
 
 fn main() {
     MidiOutDevices::list();
+    MidiInDevices::list();
     
     let (cmd_stop_tx, cmd_stop_rx) = mpsc::channel();
+
+    thread::spawn(move || {
+        let mut midi_in = MidiIn::using_device(3);
+        loop {
+            note_read(&mut midi_in);
+        }
+    });
     
     thread::spawn(move || {
         let g = getch::Getch::new();
@@ -40,15 +52,9 @@ fn main() {
             }
         }
     });
-    
-    let mut midi_out = MidiOut::using_device(2);
-    let mut n = 0;
+
     loop {
-        note_test(&mut midi_out, 40 + (2 * n));
-        n += 1;
-        if n > 20 {
-            n = 0;
-        }
+
         match cmd_stop_rx.try_recv() {
             Ok(_) => {
                 println!("stopping...");

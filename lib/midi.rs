@@ -32,6 +32,11 @@ pub enum PmError {
     PmBufferMaxSize = -9992,
 }
 
+#[repr(C)]
+pub struct C_PmEvent {
+    pub message: i32,
+    pub timestamp: u32,
+}
 
 #[link(name = "portmidi")]
 extern "C" {
@@ -40,7 +45,10 @@ extern "C" {
     pub fn Pm_CountDevices() -> c_int;
     pub fn Pm_GetDeviceInfo(id: c_int) -> *const PmDeviceInfo;
     pub fn Pm_OpenOutput(stream: *const *const c_void, outputDeviceId: c_int, inputDriverInfo: *const c_void, bufferSize: i32, time_proc: *const c_void, time_info: *const c_void, latency: i32) -> PmError;
+    pub fn Pm_OpenInput(stream: *const *const c_void, inputDevice: c_int, inputDriverInfo: *const c_void, bufferSize : i32, time_proc: *const c_void, time_info: *const c_void) -> PmError;
     pub fn Pm_WriteShort(stream: *const c_void, timestamp: u32, message: c_uint) -> PmError;
+    pub fn Pm_Poll(stream : *const c_void) -> PmError;
+    pub fn Pm_Read(stream: *const c_void, buffer: *mut C_PmEvent, length: i32) -> i16;
     pub fn Pm_Close(stream: *const c_void) -> PmError;
     pub fn Pm_WriteSysEx(stream: *const c_void, when: u32, msg: *const c_uchar) -> PmError;
 }
@@ -81,12 +89,11 @@ impl MidiOutDevices {
         for d in 0..n {
             let info_ptr = unsafe { Pm_GetDeviceInfo(d) };
             if 1 == unsafe { (*info_ptr).output } {
-                println!("{}", to_string(unsafe { (*info_ptr).name }));
+                println!("{} {} can output", d, to_string(unsafe { (*info_ptr).name }));
             }
         }
     }
 }
-
 
 pub struct MidiOut {
     ostream: *const c_void
@@ -121,5 +128,69 @@ impl Drop for MidiOut {
         unsafe { Pm_Close(self.ostream) };
         unsafe { Pm_Terminate() };
         println!("MidiOut closed");
+    }
+}
+
+
+pub struct MidiInDevices;
+impl MidiInDevices {
+    pub fn list() {
+        let n = unsafe { Pm_CountDevices() };
+        for d in 0..n {
+            let info_ptr = unsafe { Pm_GetDeviceInfo(d) };
+            if 1 == unsafe { (*info_ptr).input } {
+                println!("{} {} can input", d, to_string(unsafe { (*info_ptr).name }));
+            }
+        }
+    }
+}
+
+pub struct MidiIn {
+    istream: *const c_void
+}
+
+impl MidiIn {
+    pub fn using_device(id: i32) -> MidiIn {
+        let m = MidiIn {
+            istream: ptr::null()
+        };
+        let buffer_size: c_int = 1024;
+        let res = unsafe { Pm_OpenInput(&m.istream, id, ptr::null(), buffer_size, ptr::null(), ptr::null()) };
+        println!("opening input: {}", res as i32);
+        thread::sleep(Duration::from_millis(1000));
+        m
+    }
+
+    pub fn read(&mut self) {
+        let status: PmError = unsafe { Pm_Poll(self.istream) };
+        match status as PmError {
+            PmError::PmGotData => {
+                let mut e = C_PmEvent {
+                    message: 0,
+                    timestamp: 0
+                };
+                let len: i16 = unsafe { Pm_Read(self.istream, &mut e, 1) };
+                let msg = MidiMessage {
+                    data3: 0,
+                    data2: (e.message >> 16) as u8,
+                    data1: (e.message >> 8) as u8,
+                    status: (e.message & 0xFF) as u8
+                };
+                let channel = msg.status & 0xF;
+                let instruction = msg.status & 0xF0;
+                if len > 0 && msg.data2 > 0 {
+                    println!("channel: {}, instruction: 0x{:x}, note: {}, velocity: {}", channel + 1, instruction, msg.data1, msg.data2);
+                }
+            },
+            _ => {}
+        }
+    }
+}
+
+impl Drop for MidiIn {
+    fn drop(&mut self) {
+        unsafe { Pm_Close(self.istream) };
+        unsafe { Pm_Terminate() };
+        println!("MidiIn closed");
     }
 }
