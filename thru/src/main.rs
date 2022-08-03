@@ -34,13 +34,17 @@ impl MidiCallback for HoldingThru {
         let channel = msg.status & 0xF;
         let instruction = msg.status & 0xF0;
         if msg.data2 > 0 {
-            if self.last_note != 0 {
+            let same = self.last_note == msg.data1;
+            if self.last_note != 0 || same {
                 let off = MidiMessage::note_off(self.last_note, CHANNEL);
                 self.midi_out.send(&off);
+                self.last_note = 0;
             }
-            let on = MidiMessage::note_on(msg.data1, CHANNEL);
-            self.midi_out.send(&on);
-            self.last_note = msg.data1;
+            if !same {
+                let on = MidiMessage::note_on(msg.data1, CHANNEL);
+                self.midi_out.send(&on);
+                self.last_note = msg.data1;
+            }
         }
     }
 }
