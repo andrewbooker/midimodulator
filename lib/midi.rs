@@ -165,7 +165,7 @@ impl MidiIn {
         m
     }
 
-    pub fn read(&mut self, callback: &dyn MidiCallback) {
+    pub fn read<C: MidiCallback>(&mut self, callback: &C) {
         let status: PmError = unsafe { Pm_Poll(self.istream) };
         match status as PmError {
             PmError::PmGotData => {
