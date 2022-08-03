@@ -150,7 +150,7 @@ pub struct MidiIn {
 }
 
 pub trait MidiCallback {
-    fn receive(&self, message: &MidiMessage);
+    fn receive(&mut self, message: &MidiMessage);
 }
 
 impl MidiIn {
@@ -165,7 +165,7 @@ impl MidiIn {
         m
     }
 
-    pub fn read<C: MidiCallback>(&mut self, callback: &C) {
+    pub fn read<C: MidiCallback>(&mut self, callback: &mut C) {
         let status: PmError = unsafe { Pm_Poll(self.istream) };
         match status as PmError {
             PmError::PmGotData => {

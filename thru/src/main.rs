@@ -24,20 +24,23 @@ fn note_test(midi_out: &mut MidiOut, note: u8) {
 
 
 
-struct SimpleThru;
+struct SimpleThru {
+    midi_out: MidiOut
+}
 
 impl MidiCallback for SimpleThru {
-    fn receive(&self, msg: &MidiMessage) {
+    fn receive(&mut self, msg: &MidiMessage) {
         let channel = msg.status & 0xF;
         let instruction = msg.status & 0xF0;
         if msg.data2 > 0 {
             println!("channel: {}, instruction: 0x{:x}, note: {}, velocity: {}", channel + 1, instruction, msg.data1, msg.data2);
+            let on = MidiMessage::note_on(msg.data1, CHANNEL);
+            let off = MidiMessage::note_off(msg.data1, CHANNEL);
+            self.midi_out.send(&on);
+            thread::sleep(Duration::from_millis(1));
+            self.midi_out.send(&off);
         }
     }
-}
-
-fn note_read(midi_in: &mut MidiIn, thru: &SimpleThru) {
-    midi_in.read(thru);
 }
 
 
@@ -49,9 +52,11 @@ fn main() {
 
     thread::spawn(move || {
         let mut midi_in = MidiIn::using_device(3);
-        let thru = SimpleThru {};
+        let mut thru = SimpleThru {
+            midi_out: MidiOut::using_device(2)
+        };
         loop {
-            note_read(&mut midi_in, &thru);
+            midi_in.read(&mut thru);
         }
     });
     
@@ -70,7 +75,6 @@ fn main() {
     });
 
     loop {
-
         match cmd_stop_rx.try_recv() {
             Ok(_) => {
                 println!("stopping...");
