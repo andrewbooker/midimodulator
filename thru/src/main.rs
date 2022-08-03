@@ -24,22 +24,34 @@ fn note_test(midi_out: &mut MidiOut, note: u8) {
 
 
 
-struct SimpleThru {
-    midi_out: MidiOut
+struct HoldingThru {
+    midi_out: MidiOut,
+    last_note: u8
 }
 
-impl MidiCallback for SimpleThru {
+impl MidiCallback for HoldingThru {
     fn receive(&mut self, msg: &MidiMessage) {
         let channel = msg.status & 0xF;
         let instruction = msg.status & 0xF0;
         if msg.data2 > 0 {
-            println!("channel: {}, instruction: 0x{:x}, note: {}, velocity: {}", channel + 1, instruction, msg.data1, msg.data2);
+            if self.last_note != 0 {
+                let off = MidiMessage::note_off(self.last_note, CHANNEL);
+                self.midi_out.send(&off);
+            }
             let on = MidiMessage::note_on(msg.data1, CHANNEL);
-            let off = MidiMessage::note_off(msg.data1, CHANNEL);
             self.midi_out.send(&on);
-            thread::sleep(Duration::from_millis(1));
+            self.last_note = msg.data1;
+        }
+    }
+}
+
+impl Drop for HoldingThru {
+    fn drop(&mut self) {
+        if self.last_note != 0 {
+            let off = MidiMessage::note_off(self.last_note, CHANNEL);
             self.midi_out.send(&off);
         }
+        println!("HoldingThru closed");
     }
 }
 
@@ -49,14 +61,22 @@ fn main() {
     MidiInDevices::list();
     
     let (cmd_stop_tx, cmd_stop_rx) = mpsc::channel();
+    let (midi_stop_tx, midi_stop_rx) = mpsc::channel();
 
-    thread::spawn(move || {
+    let midi_loop_handle = thread::spawn(move || {
         let mut midi_in = MidiIn::using_device(3);
-        let mut thru = SimpleThru {
-            midi_out: MidiOut::using_device(2)
+        let mut thru = HoldingThru {
+            midi_out: MidiOut::using_device(2),
+            last_note: 0
         };
         loop {
             midi_in.read(&mut thru);
+            match midi_stop_rx.try_recv() {
+                Ok(_) => {
+                    break;
+                },
+                _ => {}
+            }
         }
     });
     
@@ -67,6 +87,7 @@ fn main() {
             match c as char {
                 'q' => {
                     cmd_stop_tx.send(()).unwrap();
+                    midi_stop_tx.send(()).unwrap();
                     break;
                 },
                 _ => {}
@@ -83,4 +104,6 @@ fn main() {
             _ => {}
         }
     }
+
+    midi_loop_handle.join();
 }
