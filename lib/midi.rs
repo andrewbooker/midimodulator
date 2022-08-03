@@ -54,9 +54,9 @@ extern "C" {
 }
 
 pub struct MidiMessage {
-    status: u8,
-    data1: u8,
-    data2: u8,
+    pub status: u8,
+    pub data1: u8,
+    pub data2: u8,
     data3: u8
 }
 
@@ -149,6 +149,10 @@ pub struct MidiIn {
     istream: *const c_void
 }
 
+pub trait MidiCallback {
+    fn receive(&self, message: &MidiMessage);
+}
+
 impl MidiIn {
     pub fn using_device(id: i32) -> MidiIn {
         let m = MidiIn {
@@ -161,7 +165,7 @@ impl MidiIn {
         m
     }
 
-    pub fn read(&mut self) {
+    pub fn read(&mut self, callback: &dyn MidiCallback) {
         let status: PmError = unsafe { Pm_Poll(self.istream) };
         match status as PmError {
             PmError::PmGotData => {
@@ -170,16 +174,14 @@ impl MidiIn {
                     timestamp: 0
                 };
                 let len: i16 = unsafe { Pm_Read(self.istream, &mut e, 1) };
-                let msg = MidiMessage {
-                    data3: 0,
-                    data2: (e.message >> 16) as u8,
-                    data1: (e.message >> 8) as u8,
-                    status: (e.message & 0xFF) as u8
-                };
-                let channel = msg.status & 0xF;
-                let instruction = msg.status & 0xF0;
-                if len > 0 && msg.data2 > 0 {
-                    println!("channel: {}, instruction: 0x{:x}, note: {}, velocity: {}", channel + 1, instruction, msg.data1, msg.data2);
+                if len > 0 {
+                    let msg = MidiMessage {
+                        data3: 0,
+                        data2: (e.message >> 16) as u8,
+                        data1: (e.message >> 8) as u8,
+                        status: (e.message & 0xFF) as u8
+                    };
+                    callback.receive(&msg);
                 }
             },
             _ => {}

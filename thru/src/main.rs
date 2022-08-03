@@ -2,7 +2,7 @@
 
 #[path = "../../lib/midi.rs"] mod midi;
 
-use crate::midi::{MidiMessage, MidiOut, MidiOutDevices, MidiIn, MidiInDevices};
+use crate::midi::{MidiMessage, MidiOut, MidiOutDevices, MidiIn, MidiInDevices, MidiCallback};
 use std::{
     thread,
     time::Duration,
@@ -21,8 +21,23 @@ fn note_test(midi_out: &mut MidiOut, note: u8) {
     thread::sleep(Duration::from_millis(125));
 }
 
-fn note_read(midi_in: &mut MidiIn) {
-    midi_in.read();
+
+
+
+struct SimpleThru;
+
+impl MidiCallback for SimpleThru {
+    fn receive(&self, msg: &MidiMessage) {
+        let channel = msg.status & 0xF;
+        let instruction = msg.status & 0xF0;
+        if msg.data2 > 0 {
+            println!("channel: {}, instruction: 0x{:x}, note: {}, velocity: {}", channel + 1, instruction, msg.data1, msg.data2);
+        }
+    }
+}
+
+fn note_read(midi_in: &mut MidiIn, thru: &SimpleThru) {
+    midi_in.read(thru);
 }
 
 
@@ -34,8 +49,9 @@ fn main() {
 
     thread::spawn(move || {
         let mut midi_in = MidiIn::using_device(3);
+        let thru = SimpleThru {};
         loop {
-            note_read(&mut midi_in);
+            note_read(&mut midi_in, &thru);
         }
     });
     
