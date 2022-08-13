@@ -107,7 +107,7 @@ impl MidiNoteSink for HoldingThru {
 
 impl Drop for HoldingThru {
     fn drop(&mut self) {
-        self.midi_out.message(&[123, 0, 0]);
+        self.midi_out.message(&[0xB0, 0x7B, 0]);
         println!("HoldingThru closed");
     }
 }
