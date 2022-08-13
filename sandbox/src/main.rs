@@ -17,6 +17,32 @@ impl Note {
     }
 }
 
+
+trait MidiNoteSink {
+    fn receive(&self, note: &Note);
+}
+
+struct SimpleThru {
+    midi_out: RtMidiOut
+}
+
+impl SimpleThru {
+    pub fn using_device(d: u32) -> SimpleThru {
+        let t = SimpleThru {
+            midi_out: RtMidiOut::new(Default::default()).unwrap()
+        };
+        t.midi_out.open_port(d, "SimpleThru out");
+        t
+    }
+}
+
+impl MidiNoteSink for SimpleThru {
+    fn receive(&self, n: &Note) {
+        self.midi_out.message(&[0x90, n.note, n.velocity]);
+        self.midi_out.message(&[0x80, n.note, 0]);
+    }
+}
+
 fn main() -> Result<(), RtMidiError> {
 
     let input = RtMidiIn::new(Default::default())?;
@@ -26,31 +52,21 @@ fn main() -> Result<(), RtMidiError> {
         println!("Input {}: {}", port + 1, input.port_name(port)?);
     }
 
-    let output = RtMidiOut::new(Default::default())?;
-    let output_ports = output.port_count()?;
-    println!("{} MIDI output ports available.", output_ports);
-
-    for port in 0..output_ports {
-        println!("Output {}: {}", port + 1, output.port_name(port)?);
-    }
-
     input.open_port(2, "RtMidi Input")?;
-    output.open_port(2, "RtMidi Output")?;
+    let thru = SimpleThru::using_device(2);
 
     input.set_callback(|timestamp, message| {
         let n = Note::from_midi_message(&message);
         if n.velocity != 0 {
             println!("{:02x} {} {}", message[0], n.note, n.velocity);
-            output.message(&[0x90, n.note, n.velocity]);
-            output.message(&[0x80, n.note, 0]);
+            thru.receive(&n);
         }
     })?;
 
     input.ignore_types(true, true, true)?;
 
     println!("Reading MIDI input ...");
-    
-   
+
     let (cmd_stop_tx, cmd_stop_rx) = mpsc::channel();
     thread::spawn(move || {
         let g = getch::Getch::new();
