@@ -1,4 +1,5 @@
 use std::sync::mpsc;
+use std::sync::Mutex;
 use std::thread;
 use rtmidi::{RtMidiIn, RtMidiOut, RtMidiError};
 
@@ -19,8 +20,11 @@ impl Note {
 
 
 trait MidiNoteSink {
-    fn receive(&self, note: &Note);
+    fn receive(&mut self, note: &Note);
 }
+
+
+// SimpleThru
 
 struct SimpleThru {
     midi_out: RtMidiOut
@@ -37,11 +41,54 @@ impl SimpleThru {
 }
 
 impl MidiNoteSink for SimpleThru {
-    fn receive(&self, n: &Note) {
+    fn receive(&mut self, n: &Note) {
         self.midi_out.message(&[0x90, n.note, n.velocity]);
         self.midi_out.message(&[0x80, n.note, 0]);
     }
 }
+
+
+// HoldingThru
+
+struct HoldingThru {
+    midi_out: RtMidiOut,
+    last_note: u8
+}
+
+impl HoldingThru {
+    pub fn using_device(d: u32) -> HoldingThru {
+        let t = HoldingThru {
+            midi_out: RtMidiOut::new(Default::default()).unwrap(),
+            last_note: 0
+        };
+        t.midi_out.open_port(d, "HoldingThru out");
+        t
+    }
+}
+
+impl MidiNoteSink for HoldingThru {
+    fn receive(&mut self, n: &Note) {
+        let same = self.last_note == n.note;
+        if self.last_note != 0 || same {
+            self.midi_out.message(&[0x80, self.last_note, 0]);
+            self.last_note = 0;
+        }
+        if !same {
+            self.midi_out.message(&[0x90, n.note, n.velocity]);
+            self.last_note = n.note;
+        }
+    }
+}
+
+impl Drop for HoldingThru {
+    fn drop(&mut self) {
+        if self.last_note != 0 {
+            self.midi_out.message(&[0x80, self.last_note, 0]);
+        }
+        println!("HoldingThru closed");
+    }
+}
+
 
 fn main() -> Result<(), RtMidiError> {
 
@@ -53,19 +100,19 @@ fn main() -> Result<(), RtMidiError> {
     }
 
     input.open_port(2, "RtMidi Input")?;
-    let thru = SimpleThru::using_device(2);
+    let mut thru = Mutex::new(HoldingThru::using_device(2));
 
     input.set_callback(|timestamp, message| {
         let n = Note::from_midi_message(&message);
         if n.velocity != 0 {
             println!("{:02x} {} {}", message[0], n.note, n.velocity);
-            thru.receive(&n);
+            thru.lock().unwrap().receive(&n);
         }
     })?;
 
     input.ignore_types(true, true, true)?;
 
-    println!("Reading MIDI input ...");
+    println!("Starting...");
 
     let (cmd_stop_tx, cmd_stop_rx) = mpsc::channel();
     thread::spawn(move || {
