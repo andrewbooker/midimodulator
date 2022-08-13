@@ -18,9 +18,38 @@ impl Note {
     }
 }
 
+struct NoteStats {
+    note: u8
+}
+
+
+impl NoteStats {
+    fn new() -> NoteStats {
+        NoteStats {
+            note: 0
+        }
+    }
+
+    fn last_note(&self) -> Option<u8> {
+        match self.note {
+            0 => None,
+            n => Some(n)
+        }
+    }
+
+    fn add(&mut self, n: &Note) {
+        if self.note != n.note {
+            self.note = n.note;
+        } else {
+            self.note = 0;
+        }
+    }
+}
+
+
 
 trait MidiNoteSink {
-    fn receive(&mut self, note: &Note);
+    fn receive(&self, note: &Note, stats: &NoteStats);
 }
 
 
@@ -41,7 +70,7 @@ impl SimpleThru {
 }
 
 impl MidiNoteSink for SimpleThru {
-    fn receive(&mut self, n: &Note) {
+    fn receive(&self, n: &Note, _stats: &NoteStats) {
         self.midi_out.message(&[0x90, n.note, n.velocity]);
         self.midi_out.message(&[0x80, n.note, 0]);
     }
@@ -51,15 +80,13 @@ impl MidiNoteSink for SimpleThru {
 // HoldingThru
 
 struct HoldingThru {
-    midi_out: RtMidiOut,
-    last_note: u8
+    midi_out: RtMidiOut
 }
 
 impl HoldingThru {
     pub fn using_device(d: u32) -> HoldingThru {
         let t = HoldingThru {
-            midi_out: RtMidiOut::new(Default::default()).unwrap(),
-            last_note: 0
+            midi_out: RtMidiOut::new(Default::default()).unwrap()
         };
         t.midi_out.open_port(d, "HoldingThru out");
         t
@@ -67,24 +94,20 @@ impl HoldingThru {
 }
 
 impl MidiNoteSink for HoldingThru {
-    fn receive(&mut self, n: &Note) {
-        let same = self.last_note == n.note;
-        if self.last_note != 0 || same {
-            self.midi_out.message(&[0x80, self.last_note, 0]);
-            self.last_note = 0;
+    fn receive(&self, n: &Note, stats: &NoteStats) {
+        if !stats.last_note().is_none() {
+            self.midi_out.message(&[0x80, stats.last_note().unwrap(), 0]);
         }
-        if !same {
+
+        if stats.last_note().is_none() || stats.last_note().unwrap() != n.note {
             self.midi_out.message(&[0x90, n.note, n.velocity]);
-            self.last_note = n.note;
         }
     }
 }
 
 impl Drop for HoldingThru {
     fn drop(&mut self) {
-        if self.last_note != 0 {
-            self.midi_out.message(&[0x80, self.last_note, 0]);
-        }
+        self.midi_out.message(&[123, 0, 0]);
         println!("HoldingThru closed");
     }
 }
@@ -100,13 +123,17 @@ fn main() -> Result<(), RtMidiError> {
     }
 
     input.open_port(2, "RtMidi Input")?;
-    let mut thru = Mutex::new(HoldingThru::using_device(2));
+    let mut stats = Mutex::new(NoteStats::new());
+    let thru = HoldingThru::using_device(2);
 
-    input.set_callback(|timestamp, message| {
+    input.set_callback(|_timestamp, message| {
         let n = Note::from_midi_message(&message);
         if n.velocity != 0 {
             println!("{:02x} {} {}", message[0], n.note, n.velocity);
-            thru.lock().unwrap().receive(&n);
+
+            let mut s = stats.lock().unwrap();
+            thru.receive(&n, &s);
+            s.add(&n);
         }
     })?;
 
