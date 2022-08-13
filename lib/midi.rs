@@ -38,6 +38,7 @@ pub struct C_PmEvent {
     pub timestamp: u32,
 }
 
+#[allow(dead_code)]
 #[link(name = "portmidi")]
 extern "C" {
     pub fn Pm_Initialize() -> c_int;
