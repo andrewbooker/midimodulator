@@ -2,42 +2,47 @@ use std::sync::mpsc;
 use std::thread;
 use rtmidi::{RtMidiIn, RtMidiOut, RtMidiError};
 
+
+struct Note {
+    note: u8,
+    velocity: u8
+}
+
+impl Note {
+    pub fn from_midi_message(message: &[u8]) -> Note {
+        Note {
+            note: message[1],
+            velocity: message[2]
+        }
+    }
+}
+
 fn main() -> Result<(), RtMidiError> {
 
-    // Initialise MIDI input
     let input = RtMidiIn::new(Default::default())?;
-
-    // Get number of input ports
     let input_ports = input.port_count()?;
-    println!("There are {} MIDI input sources available.", input_ports);
-
-    // List input ports
+    println!("{} MIDI input sources", input_ports);
     for port in 0..input_ports {
-        println!("\tInput Port #{}: {}", port+1, input.port_name(port)?);
+        println!("Input {}: {}", port + 1, input.port_name(port)?);
     }
 
-    // Initialise MIDI output
     let output = RtMidiOut::new(Default::default())?;
-
-    // Get number of output ports
     let output_ports = output.port_count()?;
-    println!("There are {} MIDI output ports available.", output_ports);
+    println!("{} MIDI output ports available.", output_ports);
 
-    // List output ports
     for port in 0..output_ports {
-        println!("\tOutput Port #{}: {}", port+1, output.port_name(port)?);
+        println!("Output {}: {}", port + 1, output.port_name(port)?);
     }
-    
-    
-    // Open first available port
-    input.open_port(2, "RtMidi Input")?;
 
-    // Set our callback function.  This should be done immediately after
-    // opening the port to avoid having incoming messages written to the
-    // queue.
+    input.open_port(2, "RtMidi Input")?;
+    output.open_port(2, "RtMidi Output")?;
+
     input.set_callback(|timestamp, message| {
-        for (index, byte) in message.iter().enumerate() {
-            println!("Byte {} = 0x{:02x}, ", index, byte);
+        let n = Note::from_midi_message(&message);
+        if n.velocity != 0 {
+            println!("{:02x} {} {}", message[0], n.note, n.velocity);
+            output.message(&[0x90, n.note, n.velocity]);
+            output.message(&[0x80, n.note, 0]);
         }
     })?;
 
