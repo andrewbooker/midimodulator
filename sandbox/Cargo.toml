@@ -7,3 +7,4 @@ edition = "2021"
 
 [dependencies]
 rtmidi = "0.2.0"
+getch = "0.2.1"

@@ -1,7 +1,9 @@
-use std::io::{stdin, Read};
+use std::sync::mpsc;
+use std::thread;
 use rtmidi::{RtMidiIn, RtMidiOut, RtMidiError};
 
 fn main() -> Result<(), RtMidiError> {
+
     // Initialise MIDI input
     let input = RtMidiIn::new(Default::default())?;
 
@@ -42,7 +44,32 @@ fn main() -> Result<(), RtMidiError> {
     input.ignore_types(true, true, true)?;
 
     println!("Reading MIDI input ...");
-    stdin().read(&mut [0]).unwrap();
+    
+   
+    let (cmd_stop_tx, cmd_stop_rx) = mpsc::channel();
+    thread::spawn(move || {
+        let g = getch::Getch::new();
+        loop {
+            let c: u8 = g.getch().unwrap();
+            match c as char {
+                'q' => {
+                    cmd_stop_tx.send(()).unwrap();
+                    break;
+                },
+                _ => {}
+            }
+        }
+    });
+
+    loop {
+        match cmd_stop_rx.try_recv() {
+            Ok(_) => {
+                println!("stopping...");
+                break;
+            },
+            _ => {}
+        }
+    }
     
     Ok(())
 }
