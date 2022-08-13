@@ -77,6 +77,37 @@ impl MidiNoteSink for SimpleThru {
 }
 
 
+// NoteMapThru
+
+struct NoteMapThru<'a, S: MidiNoteSink> {
+    next: &'a S,
+    tonic: u8
+}
+
+
+impl <'a, S: MidiNoteSink>NoteMapThru<'a, S> {
+    pub fn to(tonic: u8, next: &'a S) -> NoteMapThru<'a, S> {
+        NoteMapThru::<'a, S> {
+            tonic,
+            next
+        }
+    }
+}
+
+
+impl <'a, S: MidiNoteSink>MidiNoteSink for NoteMapThru<'a, S> {
+    fn receive(&self, n: &Note, stats: &NoteStats) {
+        
+        let transposed = Note {
+            note: self.tonic + n.note,
+            velocity: n.velocity
+        };
+        
+        self.next.receive(&transposed, &stats);
+    }
+}   
+
+
 // HoldingThru
 
 struct HoldingThru {
