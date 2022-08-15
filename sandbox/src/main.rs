@@ -61,6 +61,11 @@ impl NoteStats {
             self.sent = 0;
         }
     }
+
+    fn clear(&mut self) {
+        self.sent = 0;
+        self.received = 0;
+    }
 }
 
 
@@ -145,13 +150,14 @@ impl MidiNoteSink for HoldingThru {
     fn receive(&self, n: &Note, stats: &mut NoteStats) {
         if !stats.last_sent().is_none() {
             let ls = stats.last_sent().unwrap();
-            println!("note off {}", ls);
             self.midi_out.message(&[0x80, ls, 0]);
         }
 
         if stats.last_sent().is_none() || stats.last_sent().unwrap() != n.note {
             self.midi_out.message(&[0x90, n.note, n.velocity]);
             stats.put_sent(&n);
+        } else {
+            stats.clear();
         }
     }
 }
@@ -174,8 +180,10 @@ fn main() -> Result<(), RtMidiError> {
     }
 
     input.open_port(2, "RtMidi Input")?;
+
     let stats = Mutex::new(NoteStats::new());
-    let thru = HoldingThru::using_device(2);
+    let hold = HoldingThru::using_device(2);
+    let thru = NoteMapThru::to(46, &hold);
 
     input.set_callback(|_timestamp, message| {
         let n = Note::from_midi_message(&message);
