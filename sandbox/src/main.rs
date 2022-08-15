@@ -19,29 +19,46 @@ impl Note {
 }
 
 struct NoteStats {
-    note: u8
+    received: u8,
+    sent: u8
 }
 
 
 impl NoteStats {
     fn new() -> NoteStats {
         NoteStats {
-            note: 0
+            received: 0,
+            sent: 0
         }
     }
 
-    fn last_note(&self) -> Option<u8> {
-        match self.note {
+    fn last_received(&self) -> Option<u8> {
+        match self.received {
+            0 => None,
+            n => Some(n)
+        }
+    }
+    
+    fn last_sent(&self) -> Option<u8> {
+        match self.sent {
             0 => None,
             n => Some(n)
         }
     }
 
-    fn add(&mut self, n: &Note) {
-        if self.note != n.note {
-            self.note = n.note;
+    fn put_received(&mut self, n: &Note) {
+        if self.received != n.note {
+            self.received = n.note;
         } else {
-            self.note = 0;
+            self.received = 0;
+        }
+    }
+
+    fn put_sent(&mut self, n: &Note) {
+        if self.sent != n.note {
+            self.sent = n.note;
+        } else {
+            self.sent = 0;
         }
     }
 }
@@ -49,7 +66,7 @@ impl NoteStats {
 
 
 trait MidiNoteSink {
-    fn receive(&self, note: &Note, stats: &NoteStats);
+    fn receive(&self, note: &Note, stats: &mut NoteStats);
 }
 
 
@@ -70,7 +87,7 @@ impl SimpleThru {
 }
 
 impl MidiNoteSink for SimpleThru {
-    fn receive(&self, n: &Note, _stats: &NoteStats) {
+    fn receive(&self, n: &Note, _stats: &mut NoteStats) {
         self.midi_out.message(&[0x90, n.note, n.velocity]);
         self.midi_out.message(&[0x80, n.note, 0]);
     }
@@ -96,14 +113,14 @@ impl <'a, S: MidiNoteSink>NoteMapThru<'a, S> {
 
 
 impl <'a, S: MidiNoteSink>MidiNoteSink for NoteMapThru<'a, S> {
-    fn receive(&self, n: &Note, stats: &NoteStats) {
-        
+    fn receive(&self, n: &Note, stats: &mut NoteStats) {
+        stats.put_received(&n);
         let transposed = Note {
             note: self.tonic + n.note,
             velocity: n.velocity
         };
         
-        self.next.receive(&transposed, &stats);
+        self.next.receive(&transposed, stats);
     }
 }   
 
@@ -125,13 +142,16 @@ impl HoldingThru {
 }
 
 impl MidiNoteSink for HoldingThru {
-    fn receive(&self, n: &Note, stats: &NoteStats) {
-        if !stats.last_note().is_none() {
-            self.midi_out.message(&[0x80, stats.last_note().unwrap(), 0]);
+    fn receive(&self, n: &Note, stats: &mut NoteStats) {
+        if !stats.last_sent().is_none() {
+            let ls = stats.last_sent().unwrap();
+            println!("note off {}", ls);
+            self.midi_out.message(&[0x80, ls, 0]);
         }
 
-        if stats.last_note().is_none() || stats.last_note().unwrap() != n.note {
+        if stats.last_sent().is_none() || stats.last_sent().unwrap() != n.note {
             self.midi_out.message(&[0x90, n.note, n.velocity]);
+            stats.put_sent(&n);
         }
     }
 }
@@ -154,7 +174,7 @@ fn main() -> Result<(), RtMidiError> {
     }
 
     input.open_port(2, "RtMidi Input")?;
-    let mut stats = Mutex::new(NoteStats::new());
+    let stats = Mutex::new(NoteStats::new());
     let thru = HoldingThru::using_device(2);
 
     input.set_callback(|_timestamp, message| {
@@ -163,8 +183,7 @@ fn main() -> Result<(), RtMidiError> {
             println!("{:02x} {} {}", message[0], n.note, n.velocity);
 
             let mut s = stats.lock().unwrap();
-            thru.receive(&n, &s);
-            s.add(&n);
+            thru.receive(&n, &mut s);
         }
     })?;
 
