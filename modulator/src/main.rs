@@ -1,7 +1,7 @@
 extern crate libc;
 
 mod korg;
-#[path = "../../lib/midi.rs"] mod midi;
+mod midi;
 
 use crate::korg::{CHANNEL, KorgProgramSysEx};
 use crate::midi::{MidiMessage, MidiOut, MidiOutDevices};
