@@ -8,11 +8,12 @@ use crate::midi::{MidiMessage, MidiOut, MidiOutDevices};
 use std::{
     f32,
     thread,
-    time::{Duration, Instant},
+    time::{Duration, Instant, SystemTime},
     collections::HashMap,
     sync::mpsc
 };
 use rand::prelude::SliceRandom;
+use chrono::prelude::{DateTime, Utc};
 
 
 struct KorgInitSysEx {
@@ -336,10 +337,12 @@ fn main() {
         let mut selector_state = HashMap::<String, i16>::new();
 
         let start = Instant::now();
+        let now: DateTime<Utc> = SystemTime::now().into();
+        let today = now.format("%Y-%m-%d").to_string();
 
         loop {
             let mut kpsx = KorgProgramSysEx::new();
-            kpsx.name("2021-01-13");
+            kpsx.name(&today);
 
             update(&mut kpsx, &mut sweep_state, &mut selector_state, &PROGRAM_SPEC, &start, None);
             update(&mut kpsx, &mut sweep_state, &mut selector_state, &OSC_SPEC, &start, Some("osc1"));
