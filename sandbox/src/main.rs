@@ -122,17 +122,59 @@ impl MidiNoteSink for SimpleThru {
 
 // NoteMapThru
 
+type Mode = [u8; 6];
+const AEOLIAN: Mode = [2, 1, 2, 2, 1, 2];
+const LYDIAN: Mode = [2, 2, 2, 1, 2, 2];
+
+const SCALE_LENGTH: usize = 9;
+
+struct Scale {
+    notes: [u8; SCALE_LENGTH]
+}
+
+const modeLen: u8 = 6;
+const scaleLen: u8 = 9;
+
+impl Scale {
+    fn from(tonic: u8, mode: &Mode) -> Scale {
+        let mut notes = [0; SCALE_LENGTH];
+        let mut octaves: u8 = 0;
+        let mut base: u8 = tonic;
+
+        for n in 0..scaleLen {
+            println!("n {} base {} octaves {}", n, base, octaves);
+            if (n % (modeLen + 1)) == 0 {
+                base = tonic + (octaves * 12) as u8;
+                octaves += 1;
+            } else {
+                println!("n {} aaaghhh", n);
+                let idx = (n - octaves) % modeLen;
+                base += mode[idx as usize];
+            }
+            notes[n as usize] = base;
+        }
+        Scale {
+            notes
+        }
+    }
+
+    fn at(&self, idx: u8) -> u8 {
+        self.notes[idx as usize]
+    }
+}
+
+
 struct NoteMapThru<'a, S: MidiNoteSink> {
     next: &'a S,
-    tonic: u8
+    scale: &'a Scale
 }
 
 
 impl <'a, S: MidiNoteSink>NoteMapThru<'a, S> {
-    pub fn to(tonic: u8, next: &'a S) -> NoteMapThru<'a, S> {
+    pub fn to(scale: &'a Scale, next: &'a S) -> NoteMapThru<'a, S> {
         NoteMapThru::<'a, S> {
-            tonic,
-            next
+            next,
+            scale
         }
     }
 }
@@ -141,7 +183,7 @@ impl <'a, S: MidiNoteSink>NoteMapThru<'a, S> {
 impl <'a, S: MidiNoteSink>MidiNoteSink for NoteMapThru<'a, S> {
     fn receive(&self, n: &Note, stats: &mut NoteStats) {
         let transposed = Note {
-            note: self.tonic + n.note,
+            note: self.scale.at(n.note),
             velocity: n.velocity
         };
         
@@ -189,7 +231,6 @@ impl Drop for HoldingThru {
     }
 }
 
-
 fn main() -> Result<(), RtMidiError> {
 
     let input = RtMidiIn::new(Default::default())?;
@@ -203,7 +244,8 @@ fn main() -> Result<(), RtMidiError> {
 
     let stats = Mutex::new(NoteStats::new());
     let hold = HoldingThru::using_device(2);
-    let mapper = NoteMapThru::to(46, &hold);
+    let scale = Scale::from(48, &LYDIAN);
+    let mapper = NoteMapThru::to(&scale, &hold);
     let sink = InputRegister::then(&mapper);
 
     input.set_callback(|_timestamp, message| {
