@@ -189,7 +189,34 @@ impl <'a, S: MidiNoteSink>MidiNoteSink for NoteMapThru<'a, S> {
         
         self.next.receive(&transposed, stats);
     }
-}   
+}
+
+
+// RandomOctaveStage
+
+struct RandomOctaveStage<'a, S: MidiNoteSink> {
+    next: &'a S
+}
+
+impl <'a, S: MidiNoteSink>RandomOctaveStage<'a, S> {
+    pub fn to(next: &'a S) -> RandomOctaveStage<'a, S> {
+        RandomOctaveStage::<'a, S> {
+            next
+        }
+    }
+}
+
+impl <'a, S: MidiNoteSink>MidiNoteSink for RandomOctaveStage<'a, S> {
+    fn receive(&self, n: &Note, stats: &mut NoteStats) {
+        let r = rand::random::<f64>();
+        let o = ((r * 4.0) as i8) - 1;
+        let transposed = Note {
+            note: (n.note as i8 + (12 * o)) as u8,
+            velocity: n.velocity
+        };
+        self.next.receive(&transposed, stats);
+    }
+}
 
 
 // HoldingThru
@@ -245,7 +272,8 @@ fn main() -> Result<(), RtMidiError> {
     let stats = Mutex::new(NoteStats::new());
     let hold = HoldingThru::using_device(2);
     let scale = Scale::from(48, &LYDIAN);
-    let mapper = NoteMapThru::to(&scale, &hold);
+    let oct = RandomOctaveStage::to(&hold);
+    let mapper = NoteMapThru::to(&scale, &oct);
     let sink = InputRegister::then(&mapper);
 
     input.set_callback(|_timestamp, message| {
