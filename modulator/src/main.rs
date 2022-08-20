@@ -165,17 +165,6 @@ const PRE_FX: [Updater; 10] = [
     Updater::Const("eff_routing", 0x10 | 0x0F) // routing | enable
 ];
 
-
-fn note_test(midi_out: &mut MidiOut, note: u8) {
-    let on = MidiMessage::note_on(note, CHANNEL);
-    let off = MidiMessage::note_off(note, CHANNEL);
-
-    midi_out.send(&on);
-    thread::sleep(Duration::from_millis(325));
-    midi_out.send(&off);
-    thread::sleep(Duration::from_millis(125));
-}
-
 struct SweepState {
     val: i8,
     freq_hz: f32
@@ -309,7 +298,7 @@ fn update<'a>(kpsx: &mut KorgProgramSysEx,
 fn main() {
     MidiOutDevices::list();
 
-    let mut midi_out = MidiOut::using_device(2);
+    let mut midi_out = MidiOut::using_device(4);
     {
         let kssx = KorgInitSysEx::new(0x02); // select prog
         midi_out.send_sys_ex(&kssx.data);
@@ -392,13 +381,7 @@ fn main() {
         }
     });
 
-    let mut n = 0;
     loop {
-        note_test(&mut midi_out, 40 + (2 * n));
-        n += 1;
-        if n > 20 {
-            n = 0;
-        }
         match cmd_stop_rx.try_recv() {
             Ok(_) => {
                 println!("stopping...");
