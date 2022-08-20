@@ -75,6 +75,27 @@ trait MidiNoteSink {
 }
 
 
+struct InputRegister<'a, S: MidiNoteSink> {
+    next: &'a S
+}
+
+impl <'a, S: MidiNoteSink>InputRegister<'a, S> {
+    fn then(next: &'a S) -> InputRegister<'a, S> {
+        InputRegister::<'a, S> {
+            next: next
+        }
+    }
+}
+
+impl <'a, S: MidiNoteSink>MidiNoteSink for InputRegister<'a, S> {
+    fn receive(&self, n: &Note, stats: &mut NoteStats) {
+        println!("got note {} vel {}", n.note, n.velocity);
+        stats.put_received(&n);
+        self.next.receive(&n, stats);
+    }
+}
+
+
 // SimpleThru
 
 struct SimpleThru {
@@ -119,7 +140,6 @@ impl <'a, S: MidiNoteSink>NoteMapThru<'a, S> {
 
 impl <'a, S: MidiNoteSink>MidiNoteSink for NoteMapThru<'a, S> {
     fn receive(&self, n: &Note, stats: &mut NoteStats) {
-        stats.put_received(&n);
         let transposed = Note {
             note: self.tonic + n.note,
             velocity: n.velocity
@@ -183,15 +203,14 @@ fn main() -> Result<(), RtMidiError> {
 
     let stats = Mutex::new(NoteStats::new());
     let hold = HoldingThru::using_device(2);
-    let thru = NoteMapThru::to(46, &hold);
+    let mapper = NoteMapThru::to(46, &hold);
+    let sink = InputRegister::then(&mapper);
 
     input.set_callback(|_timestamp, message| {
         let n = Note::from_midi_message(&message);
         if n.velocity != 0 {
-            println!("{:02x} {} {}", message[0], n.note, n.velocity);
-
             let mut s = stats.lock().unwrap();
-            thru.receive(&n, &mut s);
+            sink.receive(&n, &mut s);
         }
     })?;
 
