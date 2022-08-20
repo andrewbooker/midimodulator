@@ -89,7 +89,6 @@ impl <'a, S: MidiNoteSink>InputRegister<'a, S> {
 
 impl <'a, S: MidiNoteSink>MidiNoteSink for InputRegister<'a, S> {
     fn receive(&self, n: &Note, stats: &mut NoteStats) {
-        println!("got note {} vel {}", n.note, n.velocity);
         stats.put_received(&n);
         self.next.receive(&n, stats);
     }
@@ -120,7 +119,7 @@ impl MidiNoteSink for SimpleThru {
 }
 
 
-// NoteMapThru
+// Scale
 
 type Mode = [u8; 6];
 const AEOLIAN: Mode = [2, 1, 2, 2, 1, 2];
@@ -132,22 +131,21 @@ struct Scale {
     notes: [u8; SCALE_LENGTH]
 }
 
-const modeLen: u8 = 6;
-const scaleLen: u8 = 9;
 
 impl Scale {
     fn from(tonic: u8, mode: &Mode) -> Scale {
+        let modeLen: u8 = mode.len() as u8;
+        const scaleLen: u8 = SCALE_LENGTH as u8;
+
         let mut notes = [0; SCALE_LENGTH];
         let mut octaves: u8 = 0;
         let mut base: u8 = tonic;
 
         for n in 0..scaleLen {
-            println!("n {} base {} octaves {}", n, base, octaves);
             if (n % (modeLen + 1)) == 0 {
                 base = tonic + (octaves * 12) as u8;
                 octaves += 1;
             } else {
-                println!("n {} aaaghhh", n);
                 let idx = (n - octaves) % modeLen;
                 base += mode[idx as usize];
             }
@@ -163,6 +161,8 @@ impl Scale {
     }
 }
 
+
+// NoteMapThru
 
 struct NoteMapThru<'a, S: MidiNoteSink> {
     next: &'a S,
@@ -249,8 +249,8 @@ fn main() -> Result<(), RtMidiError> {
     let sink = InputRegister::then(&mapper);
 
     input.set_callback(|_timestamp, message| {
-        let n = Note::from_midi_message(&message);
-        if n.velocity != 0 {
+        if message[0] == 0x90 && message[2] != 0 {
+            let n = Note::from_midi_message(&message);
             let mut s = stats.lock().unwrap();
             sink.receive(&n, &mut s);
         }
