@@ -72,9 +72,9 @@ const ENV_TIME_HIGH: i8 = 10;
 const PROGRAM_SPEC: [Updater; 28] = [
     Updater::Const("oscillatorMode", 1),
     Updater::Const("noteMode", 0),
-    Updater::SelectOnZero("osc1", "vol1", true),
+    Updater::SelectOnZero("osc1", "osc1_vol", true),
     Updater::Const("osc1Register", 0),
-    Updater::SelectOnZero("osc2", "vol2", true),
+    Updater::SelectOnZero("osc2", "osc2_vol", true),
     Updater::Const("osc2Register", 0),
     Updater::Const("octave", 0),
     Updater::Sweep("detune", -17, 17),
