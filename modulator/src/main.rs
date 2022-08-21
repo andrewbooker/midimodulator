@@ -165,9 +165,9 @@ struct Effect<'a> {
 const PHASER: Effect = Effect {
     number: 32,
     mix: 50,
-    updater: [ // number: 32
+    updater: [
         Updater::Sweep("phaserDepth", 50, 99),
-        Updater::Sweep("phaserSpeed", 20, 99),
+        Updater::Sweep("phaserSpeed", 20, 99), // could make this const as the modulation varies it
         Updater::Const("phaserWaveform", 0), // 0: sine, 1: tri
         Updater::Sweep("phaserFeedback", -99, 99),
         Updater::Sweep("phaserManual", 5, 65),
@@ -182,7 +182,7 @@ const PHASER: Effect = Effect {
 const TREMOLO: Effect = Effect {
     number: 36,
     mix: 99,
-    updater: [ // number: 36
+    updater: [
         Updater::Sweep("tremoloDepth", 50, 99),
         Updater::Sweep("tremoloSpeed", 64, 127), // should be 200 but only supporting i8 atm
         Updater::Const("tremoloWaveform", 0), // 0: sine, 1: tri
@@ -197,7 +197,29 @@ const TREMOLO: Effect = Effect {
 };
 
 
-const AVAILABLE_EFFECTS: [Effect; 2] = [PHASER, TREMOLO];
+const DISTORTION: Effect = Effect {
+    number: 30,
+    mix: 50,
+    updater: [
+        Updater::Sweep("distDrive", 1, 88),
+        Updater::Sweep("distHotSpot", 2, 60),
+        Updater::Sweep("distResonance", 5, 77),
+        Updater::Const("distOut", 50),
+        Updater::Const("", 0),
+        Updater::Const("", 0),
+        Updater::Const("", 0),
+        Updater::Const("", 0),
+        Updater::Const("eff_modSource", 4), // 4, or 5 for the other effect
+        Updater::Const("eff_modAmount", 15) // 15
+    ]
+};
+
+
+const AVAILABLE_EFFECTS: [Effect; 3] = [
+    PHASER,
+    TREMOLO,
+    DISTORTION
+];
 
 
 struct EffectSelector<'a> {
