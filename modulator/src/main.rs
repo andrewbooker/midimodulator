@@ -155,15 +155,44 @@ const OSC_SPEC: [Updater; 47] = [
 
 const PRE_FX: [Updater; 10] = [
     Updater::Const("", 0),
-    Updater::Const("eff1_number", 0),
-    Updater::Const("eff2_number", 0),
-    Updater::Const("eff1_level_A", 0),
-    Updater::Const("eff1_level_B", 0),
-    Updater::Const("eff2_level_C", 0),
-    Updater::Const("eff2_level_D", 0),
+    Updater::Const("eff1_number", 32),
+    Updater::Const("eff2_number", 36),
+    Updater::Const("eff1_level_A", 50), // phaser
+    Updater::Const("eff1_level_B", 50),
+    Updater::Const("eff2_level_C", 99), // tremolo
+    Updater::Const("eff2_level_D", 99),
     Updater::Const("pan3", 101),
     Updater::Const("pan4", 1),
     Updater::Const("eff_routing", 0x10 | 0x0F) // routing | enable
+];
+
+
+type FxUpdater<'a> = [Updater<'a>; 10];
+
+const PHASER: FxUpdater = [ // number: 32
+    Updater::Sweep("phaserDepth", 50, 99),
+    Updater::Sweep("phaserSpeed", 20, 99),
+    Updater::Const("phaserWaveform", 0), // 0: sine, 1: tri
+    Updater::Sweep("phaserFeedback", -99, 99),
+    Updater::Sweep("phaserManual", 5, 65),
+    Updater::Const("", 0),
+    Updater::Const("", 0),
+    Updater::Const("", 0),
+    Updater::Const("eff_modSource", 4), // 4, or 5 for the other effect
+    Updater::Const("eff_modAmount", 15), // 15
+];
+
+const TREMOLO: FxUpdater = [ // number: 35
+    Updater::Sweep("tremoloDepth", 50, 99),
+    Updater::Sweep("tremoloSpeed", 64, 127), // should be 200 but only supporting i8 atm
+    Updater::Const("tremoloWaveform", 0), // 0: sine, 1: tri
+    Updater::Sweep("tremoloWaveShape", -99, 99),
+    Updater::Const("", 0),
+    Updater::Const("", 0),
+    Updater::Const("", 0),
+    Updater::Const("", 0),
+    Updater::Const("eff_modSource", 0), // don't bother with modulation as it only affects the balance
+    Updater::Const("eff_modAmount", 0)
 ];
 
 struct SweepState {
@@ -367,6 +396,8 @@ fn main() {
             update(&mut kpsx, &mut sweep_state, &mut selector_state, &OSC_SPEC, &start, Some("osc1"));
             update(&mut kpsx, &mut sweep_state, &mut selector_state, &OSC_SPEC, &start, Some("osc2"));
             update(&mut kpsx, &mut sweep_state, &mut selector_state, &PRE_FX, &start, None);
+            update(&mut kpsx, &mut sweep_state, &mut selector_state, &PHASER, &start, Some("eff1"));
+            update(&mut kpsx, &mut sweep_state, &mut selector_state, &TREMOLO, &start, Some("eff2"));
 
             port.write(&kpsx.data).expect("Write failed!");
             thread::sleep(Duration::from_millis(100));
