@@ -197,6 +197,9 @@ const TREMOLO: Effect = Effect {
 };
 
 
+const AVAILABLE_EFFECTS: [Effect; 2] = [PHASER, TREMOLO];
+
+
 struct EffectSelector<'a> {
     eff1: &'a Effect<'a>,
     eff2: &'a Effect<'a>
@@ -206,17 +209,17 @@ struct EffectSelector<'a> {
 impl <'a>EffectSelector<'a> {
     fn new() -> EffectSelector<'a> {
         EffectSelector {
-            eff1: &TREMOLO,
-            eff2: &PHASER
+            eff1: &AVAILABLE_EFFECTS.choose(&mut rand::thread_rng()).unwrap(),
+            eff2: &AVAILABLE_EFFECTS.choose(&mut rand::thread_rng()).unwrap()
         }
     }
     
     fn next1(&mut self) {
-        self.eff1 = &PHASER;
+        self.eff1 = &AVAILABLE_EFFECTS.choose(&mut rand::thread_rng()).unwrap();
     }
     
     fn next2(&mut self) {
-        self.eff2 = &TREMOLO;
+        self.eff2 = &AVAILABLE_EFFECTS.choose(&mut rand::thread_rng()).unwrap();
     }
     
     fn pre_eff(&self) -> FxUpdater<'a> {
