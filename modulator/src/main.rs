@@ -233,8 +233,8 @@ fn expand(a: &[(i16, i16)]) -> Vec<i16> {
         if r.1 == 0 {
             ret.push(r.0);
         } else {
-            for _ in r.0..(r.1 + 1) {
-                ret.push(r.0);
+            for osc in r.0..(r.1 + 1) {
+                ret.push(osc);
             }
         }
     }
