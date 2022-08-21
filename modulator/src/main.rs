@@ -153,47 +153,88 @@ const OSC_SPEC: [Updater; 47] = [
     Updater::Const("panCentre", 0x0F) // pan 0: A15, 0x0F: centre, 0x1E: B15
 ];
 
-const PRE_FX: [Updater; 10] = [
-    Updater::Const("", 0),
-    Updater::Const("eff1_number", 32),
-    Updater::Const("eff2_number", 36),
-    Updater::Const("eff1_level_A", 50), // phaser
-    Updater::Const("eff1_level_B", 50),
-    Updater::Const("eff2_level_C", 99), // tremolo
-    Updater::Const("eff2_level_D", 99),
-    Updater::Const("pan3", 101),
-    Updater::Const("pan4", 1),
-    Updater::Const("eff_routing", 0x10 | 0x0F) // routing | enable
-];
-
 
 type FxUpdater<'a> = [Updater<'a>; 10];
 
-const PHASER: FxUpdater = [ // number: 32
-    Updater::Sweep("phaserDepth", 50, 99),
-    Updater::Sweep("phaserSpeed", 20, 99),
-    Updater::Const("phaserWaveform", 0), // 0: sine, 1: tri
-    Updater::Sweep("phaserFeedback", -99, 99),
-    Updater::Sweep("phaserManual", 5, 65),
-    Updater::Const("", 0),
-    Updater::Const("", 0),
-    Updater::Const("", 0),
-    Updater::Const("eff_modSource", 4), // 4, or 5 for the other effect
-    Updater::Const("eff_modAmount", 15), // 15
-];
+struct Effect<'a> {
+    number: i8,
+    mix: i8,
+    updater: FxUpdater<'a>
+}
 
-const TREMOLO: FxUpdater = [ // number: 35
-    Updater::Sweep("tremoloDepth", 50, 99),
-    Updater::Sweep("tremoloSpeed", 64, 127), // should be 200 but only supporting i8 atm
-    Updater::Const("tremoloWaveform", 0), // 0: sine, 1: tri
-    Updater::Sweep("tremoloWaveShape", -99, 99),
-    Updater::Const("", 0),
-    Updater::Const("", 0),
-    Updater::Const("", 0),
-    Updater::Const("", 0),
-    Updater::Const("eff_modSource", 0), // don't bother with modulation as it only affects the balance
-    Updater::Const("eff_modAmount", 0)
-];
+const PHASER: Effect = Effect {
+    number: 32,
+    mix: 50,
+    updater: [ // number: 32
+        Updater::Sweep("phaserDepth", 50, 99),
+        Updater::Sweep("phaserSpeed", 20, 99),
+        Updater::Const("phaserWaveform", 0), // 0: sine, 1: tri
+        Updater::Sweep("phaserFeedback", -99, 99),
+        Updater::Sweep("phaserManual", 5, 65),
+        Updater::Const("", 0),
+        Updater::Const("", 0),
+        Updater::Const("", 0),
+        Updater::Const("eff_modSource", 4), // 4, or 5 for the other effect
+        Updater::Const("eff_modAmount", 15), // 15
+    ]
+};
+
+const TREMOLO: Effect = Effect {
+    number: 36,
+    mix: 99,
+    updater: [ // number: 36
+        Updater::Sweep("tremoloDepth", 50, 99),
+        Updater::Sweep("tremoloSpeed", 64, 127), // should be 200 but only supporting i8 atm
+        Updater::Const("tremoloWaveform", 0), // 0: sine, 1: tri
+        Updater::Sweep("tremoloWaveShape", -99, 99),
+        Updater::Const("", 0),
+        Updater::Const("", 0),
+        Updater::Const("", 0),
+        Updater::Const("", 0),
+        Updater::Const("eff_modSource", 0), // don't bother with modulation as it only affects the balance
+        Updater::Const("eff_modAmount", 0)
+    ]
+};
+
+
+struct EffectSelector<'a> {
+    eff1: &'a Effect<'a>,
+    eff2: &'a Effect<'a>
+}
+
+
+impl <'a>EffectSelector<'a> {
+    fn new() -> EffectSelector<'a> {
+        EffectSelector {
+            eff1: &TREMOLO,
+            eff2: &PHASER
+        }
+    }
+    
+    fn next1(&mut self) {
+        self.eff1 = &PHASER;
+    }
+    
+    fn next2(&mut self) {
+        self.eff2 = &TREMOLO;
+    }
+    
+    fn pre_eff(&self) -> FxUpdater<'a> {
+        [
+            Updater::Const("", 0),
+            Updater::Const("eff1_number", self.eff1.number),
+            Updater::Const("eff2_number", self.eff2.number),
+            Updater::Const("eff1_level_A", self.eff1.mix),
+            Updater::Const("eff1_level_B", self.eff1.mix),
+            Updater::Const("eff2_level_C", self.eff2.mix),
+            Updater::Const("eff2_level_D", self.eff2.mix),
+            Updater::Const("pan3", 101),
+            Updater::Const("pan4", 1),
+            Updater::Const("eff_routing", 0x10 | 0x0F) // routing | enable
+        ]  
+    }
+}
+
 
 struct SweepState {
     val: i8,
@@ -278,6 +319,7 @@ fn random_osc() -> i16 {
 fn update<'a>(kpsx: &mut KorgProgramSysEx,
               sweep_state: &mut HashMap::<String, SweepState>,
               selector_state: &mut HashMap::<String, i16>,
+              effect_selector: &mut EffectSelector,
               updaters: &'a [Updater],
               start: &Instant,
               prefix: Option<&str>)
@@ -335,6 +377,14 @@ fn update<'a>(kpsx: &mut KorgProgramSysEx,
                     if ss.val == 0 && ss.prev_val != 0 {
                         *state_val = random_osc();
                         println!("osc change {}", *state_val);
+                        
+                        if '1' == key.chars().last().unwrap() {
+                            effect_selector.next1();
+                            println!("eff1 change {}", effect_selector.eff1.number);
+                        } else {
+                            effect_selector.next2();
+                            println!("eff2 change {}", effect_selector.eff2.number);
+                        }
                     }
                 }
                 if *double_byte { kpsx.data_double_byte(*state_val) } else { kpsx.data(*state_val as i8) };
@@ -383,6 +433,7 @@ fn main() {
 
         let mut sweep_state = HashMap::<String, SweepState>::new();
         let mut selector_state = HashMap::<String, i16>::new();
+        let mut effect_selector = EffectSelector::new();
 
         let start = Instant::now();
         let now: DateTime<Utc> = SystemTime::now().into();
@@ -391,13 +442,17 @@ fn main() {
         loop {
             let mut kpsx = KorgProgramSysEx::new();
             kpsx.name(&today);
+            
+            let eff1_updater = &effect_selector.eff1.updater;
+            let eff2_updater = &effect_selector.eff2.updater;
+            let pre_eff = &effect_selector.pre_eff();
 
-            update(&mut kpsx, &mut sweep_state, &mut selector_state, &PROGRAM_SPEC, &start, None);
-            update(&mut kpsx, &mut sweep_state, &mut selector_state, &OSC_SPEC, &start, Some("osc1"));
-            update(&mut kpsx, &mut sweep_state, &mut selector_state, &OSC_SPEC, &start, Some("osc2"));
-            update(&mut kpsx, &mut sweep_state, &mut selector_state, &PRE_FX, &start, None);
-            update(&mut kpsx, &mut sweep_state, &mut selector_state, &PHASER, &start, Some("eff1"));
-            update(&mut kpsx, &mut sweep_state, &mut selector_state, &TREMOLO, &start, Some("eff2"));
+            update(&mut kpsx, &mut sweep_state, &mut selector_state, &mut effect_selector, &PROGRAM_SPEC, &start, None);
+            update(&mut kpsx, &mut sweep_state, &mut selector_state, &mut effect_selector, &OSC_SPEC, &start, Some("osc1"));
+            update(&mut kpsx, &mut sweep_state, &mut selector_state, &mut effect_selector, &OSC_SPEC, &start, Some("osc2"));
+            update(&mut kpsx, &mut sweep_state, &mut selector_state, &mut effect_selector, pre_eff, &start, None);
+            update(&mut kpsx, &mut sweep_state, &mut selector_state, &mut effect_selector, eff1_updater, &start, Some("eff1"));
+            update(&mut kpsx, &mut sweep_state, &mut selector_state, &mut effect_selector, eff2_updater, &start, Some("eff2"));
 
             port.write(&kpsx.data).expect("Write failed!");
             thread::sleep(Duration::from_millis(100));
