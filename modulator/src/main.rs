@@ -3,7 +3,7 @@ extern crate libc;
 mod korg;
 mod midi;
 
-use crate::korg::{CHANNEL, KorgProgramSysEx};
+use crate::korg::{CHANNEL, SysExComposer, KorgProgramSysEx};
 use crate::midi::{MidiMessage, MidiOut, MidiOutDevices};
 use std::{
     f32,
@@ -341,13 +341,13 @@ fn random_osc() -> i16 {
     *expand(&OSCILLATOR_RANGES).choose(&mut rand::thread_rng()).unwrap()
 }
 
-fn update<'a>(kpsx: &mut KorgProgramSysEx,
-              sweep_state: &mut HashMap::<String, SweepState>,
-              selector_state: &mut HashMap::<String, i16>,
-              effect_selector: &mut EffectSelector,
-              updaters: &'a [Updater],
-              start: &Instant,
-              prefix: Option<&str>)
+fn update<'a, S: SysExComposer>(kpsx: &mut S,
+    sweep_state: &mut HashMap::<String, SweepState>,
+    selector_state: &mut HashMap::<String, i16>,
+    effect_selector: &mut EffectSelector,
+    updaters: &'a [Updater],
+    start: &Instant,
+    prefix: Option<&str>)
 {
     for u in updaters {
         match u {
