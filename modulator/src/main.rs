@@ -2,7 +2,9 @@ extern crate libc;
 
 mod korg;
 mod midi;
+mod d110;
 
+use crate::d110::init_d110;
 use crate::korg::{CHANNEL, SysExComposer, KorgProgramSysEx};
 use crate::midi::{MidiMessage, MidiOut, MidiOutDevices};
 use std::{
@@ -439,6 +441,12 @@ fn main() {
     {
         let kssx = KorgSingleParamSysEx::new(0, 1); // oscillator mode: Double, on UI, otherwise the screen value overrides th sysEx
         midi_out.send_sys_ex(&kssx.data);
+    }
+
+    {
+        let d110_init = init_d110();
+        midi_out.send_sys_ex(&d110_init.to_send());
+        println!("D110 init sent");
     }
 
     let ports = serialport::available_ports().expect("No ports found!");
