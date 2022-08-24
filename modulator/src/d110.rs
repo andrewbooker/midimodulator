@@ -2,7 +2,7 @@
 use crate::utils::today;
 
 
-pub const CHANNEL_D110: u8 = 9;
+//pub const CHANNEL_D110: u8 = 9;
 
 
 pub struct D110SysEx {
@@ -85,14 +85,27 @@ pub fn init_d110() -> D110SysEx {
     sys_ex
 }
 
-
-pub struct D110TimbreSysEx {
-    pos: usize,
-    pub data: [u8; 24]
+pub fn init_timbre(number: u8) -> D110SysEx {
+    let mut sys_ex = D110SysEx::new();
+    
+    sys_ex.data(vec![0x03, 0x00, 0x02 + (0x10 * (number - 1))]); // address
+    sys_ex.data_u8(24); // keyShift in semitones, 24 = 0 shift, 27 = +3
+    sys_ex.data_u8(50); // fineTune +/- 50, 50 = 0
+    sys_ex.data_u8(12); // benderRange semitones, 0-24
+    sys_ex.data_u8(2); // note priority monoLast = 0, monoFirst, polyLast, polyFirst
+    sys_ex.data_u8(1); // outputAssign 1=mix?
+    sys_ex.data_u8(0); // reverb off
+    sys_ex.data_u8(if number == 1 { 98 } else { 0 });  // outputLevel max 100
+    sys_ex.data_u8(7);  // pan 7 = mid, 0 = R, 15 = L
+    sys_ex.data_u8(if number == 1 { 0 } else { 0x7F }); // keyRangeLower 0 = C-1
+    sys_ex.data_u8(0x7F); // keyRangeUpper 127 = G9
+    sys_ex.data_u8(0);
+    sys_ex.data_u8(0);
+    sys_ex.data_u8(0);
+    sys_ex.data_u8(0);
+    
+    sys_ex
 }
 
-pub struct D110ToneSysEx {
-    pos: usize,
-    pub data: [u8; 256]
-}
+
 

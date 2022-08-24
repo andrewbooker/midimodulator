@@ -5,7 +5,7 @@ mod midi;
 mod d110;
 mod utils;
 
-use crate::d110::init_d110;
+use crate::d110::{init_d110, init_timbre};
 use crate::korg::{CHANNEL, SysExComposer, KorgProgramSysEx};
 use crate::midi::{MidiMessage, MidiOut, MidiOutDevices};
 use std::{
@@ -446,6 +446,10 @@ fn main() {
     {
         let d110_init = init_d110();
         midi_out.send_sys_ex(&d110_init.to_send());
+        for t in 1..9 {
+            println!("sending timbre {}", t);
+            midi_out.send_sys_ex(&init_timbre(t).to_send());
+        }
         println!("D110 init sent");
     }
 
