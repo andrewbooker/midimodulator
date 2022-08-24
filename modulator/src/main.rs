@@ -3,6 +3,7 @@ extern crate libc;
 mod korg;
 mod midi;
 mod d110;
+mod utils;
 
 use crate::d110::init_d110;
 use crate::korg::{CHANNEL, SysExComposer, KorgProgramSysEx};
@@ -10,12 +11,11 @@ use crate::midi::{MidiMessage, MidiOut, MidiOutDevices};
 use std::{
     f32,
     thread,
-    time::{Duration, Instant, SystemTime},
+    time::{Duration, Instant},
     collections::HashMap,
     sync::mpsc
 };
 use rand::prelude::SliceRandom;
-use chrono::prelude::{DateTime, Utc};
 
 
 struct KorgInitSysEx {
@@ -469,8 +469,7 @@ fn main() {
         let mut effect_selector = EffectSelector::new();
 
         let start = Instant::now();
-        let now: DateTime<Utc> = SystemTime::now().into();
-        let today = now.format("%Y-%m-%d").to_string();
+        let today = utils::today();
 
         loop {
             let mut kpsx = KorgProgramSysEx::new();
