@@ -14,7 +14,8 @@ use crate::modulation::{
 use crate::d110::{
     init_d110,
     init_timbre,
-    mute_part
+    set_up_part,
+    PARTIAL_SPEC
 };
 use crate::korg::{
     KorgProgramSysEx,
@@ -32,6 +33,24 @@ use std::{
     collections::HashMap,
     sync::mpsc
 };
+
+
+use crate::modulation::Selector;
+
+struct DummySelector;
+
+impl DummySelector {
+    fn new() -> DummySelector {
+        DummySelector {}
+    }
+}
+
+impl Selector for DummySelector {
+    fn next1(&mut self) {}
+    fn next2(&mut self) {}
+
+    fn val(&self, _: u8) -> u16 { 0 }
+}
 
 
 fn main() {
@@ -66,9 +85,22 @@ fn main() {
         }
         for t in 2..9 {
             println!("muting part {}", t);
-            d110_midi_out.send_sys_ex(&mute_part(t).to_send());
+            d110_midi_out.send_sys_ex(&set_up_part(t).to_send());
         }
         println!("D110 init sent");
+
+        let start = Instant::now();
+        let mut p1 = set_up_part(1);
+        let mut sweep_state = HashMap::<String, SweepState>::new();
+        let mut dummy_1 = DummySelector::new();
+        let mut dummy_2 = DummySelector::new();
+        update(&mut p1, &mut sweep_state, &mut dummy_1, &mut dummy_2, &PARTIAL_SPEC, &start, Some("partial1"));
+        for (key, val) in &sweep_state {
+            println!("{}: {}", key, val.val);
+        }
+        d110_midi_out.send_sys_ex(&p1.to_send());
+
+        println!("part1 updated");
     }
 
     let ports = serialport::available_ports().expect("No ports found!");

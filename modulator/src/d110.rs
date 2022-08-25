@@ -2,9 +2,8 @@
 use crate::utils::today;
 
 use crate::modulation::{
-    SysExComposer
-    //Selector,
-    //Updater
+    SysExComposer,
+    Updater
 };
 
 
@@ -131,18 +130,29 @@ fn address_of(part_number: u8) -> u32 {
     }
 }
 
-pub fn mute_part(number: u8) -> D110SysEx {
+pub fn set_up_part(number: u8) -> D110SysEx {
     let mut sys_ex = D110SysEx::new();
 
     let a = address_of(number);
     let a_vec = vec![(a >> 16) as u8, ((a >> 8) & 0xFF) as u8, (a & 0xFF) as u8];
 
     sys_ex.data_vec_u8(a_vec); // address
-    sys_ex.data_str("mute");
+    sys_ex.data_str(if number == 1 { "part" } else { "mute" });
     sys_ex.data_u8(number + 0x30);
     sys_ex.data_vec_u8([0x20; 5].to_vec());
-
+    sys_ex.data_u8(0); // 0 = ss, 5 = pp
+    sys_ex.data_u8(5); // 0 = ss, 5 = pp
+    sys_ex.data_u8(if number == 1 { 0xF } else { 0 });
+    sys_ex.data_u8(0); // envelope mode
     sys_ex
 }
 
+// typedef enum t_partialConfig { ss = 0, ss_r, ps, ps_r, sp_r, pp, pp_r, s_s, p_p, ss_r_noDry, ps_r_noDry, sp_r_noDry, pp_r_noDry };
 
+
+pub const PARTIAL_SPEC: [Updater; 4] = [
+    Updater::Const("pitchCoarse", 36),
+    Updater::Sweep("pitchFine", 40, 60), // 0-100 -> +/- 50
+    Updater::Const("keyFollowPitch", 11),
+    Updater::Const("allowPitchBend", 1)
+];
