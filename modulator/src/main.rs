@@ -6,9 +6,10 @@ mod d110;
 mod utils;
 mod modulation;
 
+use crate::modulation::SysExComposer;
 use crate::modulation::Updater;
 use crate::d110::{init_d110, init_timbre};
-use crate::korg::{CHANNEL, SysExComposer, KorgProgramSysEx};
+use crate::korg::{CHANNEL, KorgProgramSysEx};
 use crate::midi::{MidiMessage, MidiOut, MidiOutDevices};
 use std::{
     f32,
