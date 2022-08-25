@@ -84,23 +84,21 @@ pub fn update<'a, S: SysExComposer, O: Selector, E: Selector>(
                 sys_ex.data(if inverse { *c } else { 0 });
             },
             Updater::Sweep(key, min, max) => {
-                let freq_hz = random_frequency();
                 let s = if prefix.is_none() { String::from(*key) } else { [prefix.unwrap(), *key].join("_") };
 
-                let state_val = sweep_state.entry(s).or_insert(SweepState::from(*max, freq_hz));
+                let state_val = sweep_state.entry(s).or_insert(SweepState::from(*max, random_frequency()));
                 let new_val = next_val_from(&start, state_val.freq_hz, *min, *max);
                 *state_val = SweepState::updated_from(&state_val, new_val);
                 sys_ex.data(new_val);
             },
             Updater::PairedInverseSweep(key, max) => {
-                let vol_freq_hz = random_frequency();
                 let s = String::from(*key);
                 let sk = [prefix.unwrap(), *key].join("_");
 
                 let normal = '1' == prefix.unwrap().chars().last().unwrap();
                 let osc_vol;
                 if normal {
-                    let master_vol = sweep_state.entry(s).or_insert(SweepState::from(*max, vol_freq_hz));
+                    let master_vol = sweep_state.entry(s).or_insert(SweepState::from(*max, random_frequency()));
                     osc_vol = next_val_from(&start, master_vol.freq_hz, 0, *max);
                     *master_vol = SweepState::updated_from(&master_vol, osc_vol);
                 } else {

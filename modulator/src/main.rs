@@ -11,7 +11,11 @@ use crate::modulation::{
     SweepState,
     update
 };
-use crate::d110::{init_d110, init_timbre};
+use crate::d110::{
+    init_d110,
+    init_timbre,
+    mute_part
+};
 use crate::korg::{
     KorgProgramSysEx,
     KorgInitSysEx,
@@ -59,6 +63,10 @@ fn main() {
         for t in 1..9 {
             println!("sending timbre {}", t);
             d110_midi_out.send_sys_ex(&init_timbre(t).to_send());
+        }
+        for t in 2..9 {
+            println!("muting part {}", t);
+            d110_midi_out.send_sys_ex(&mute_part(t).to_send());
         }
         println!("D110 init sent");
     }

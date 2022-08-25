@@ -1,6 +1,12 @@
 
 use crate::utils::today;
 
+use crate::modulation::{
+    SysExComposer
+    //Selector,
+    //Updater
+};
+
 
 //pub const CHANNEL_D110: u8 = 9;
 
@@ -24,7 +30,7 @@ impl D110SysEx {
         self.sum += v as u32;
     }
 
-    fn data(&mut self, values: Vec<u8>) {
+    fn data_vec_u8(&mut self, values: Vec<u8>) {
         for v in values {
             self.data_u8(v);
         }
@@ -66,19 +72,28 @@ impl D110SysEx {
     }
 }
 
+impl SysExComposer for D110SysEx {
+    fn data(&mut self, d: i8) {
+        self.data_u8(d as u8);
+    }
+    fn data_double_byte(&mut self, _: i16) {}
+    fn name(&mut self, _: &str) {}
+}
+
+
 pub fn init_d110() -> D110SysEx {
     const RES_ALLOWANCE_FOR_PARTIALS: [u8; 9] = [32, 0, 0, 0, 0, 0, 0, 0, 0];
     const MIDI_CHANNELS: [u8; 9] = [16, 9, 9, 9, 9, 9, 9, 9, 1];
 
     let mut sys_ex = D110SysEx::new();
 
-    sys_ex.data(vec![0x10, 0x00, 0x01]); // address to which init data is written
+    sys_ex.data_vec_u8(vec![0x10, 0x00, 0x01]); // address to which init data is written
     sys_ex.data_u8(9); // reverb type 1-8, 9=off
     sys_ex.data_u8(1); // reverb time 1-8
     sys_ex.data_u8(0); // reverb level 0-7
 
-    sys_ex.data(RES_ALLOWANCE_FOR_PARTIALS.to_vec());
-    sys_ex.data(MIDI_CHANNELS.iter().map(|c| c - 1).collect::<Vec<u8>>());
+    sys_ex.data_vec_u8(RES_ALLOWANCE_FOR_PARTIALS.to_vec());
+    sys_ex.data_vec_u8(MIDI_CHANNELS.iter().map(|c| c - 1).collect::<Vec<u8>>());
     sys_ex.data_u8(0);
     sys_ex.data_str(&today());
 
@@ -88,7 +103,7 @@ pub fn init_d110() -> D110SysEx {
 pub fn init_timbre(number: u8) -> D110SysEx {
     let mut sys_ex = D110SysEx::new();
     
-    sys_ex.data(vec![0x03, 0x00, 0x02 + (0x10 * (number - 1))]); // address
+    sys_ex.data_vec_u8(vec![0x03, 0x00, 0x02 + (0x10 * (number - 1))]); // address
     sys_ex.data_u8(24); // keyShift in semitones, 24 = 0 shift, 27 = +3
     sys_ex.data_u8(50); // fineTune +/- 50, 50 = 0
     sys_ex.data_u8(12); // benderRange semitones, 0-24
@@ -107,5 +122,27 @@ pub fn init_timbre(number: u8) -> D110SysEx {
     sys_ex
 }
 
+
+fn address_of(part_number: u8) -> u32 {
+    if part_number == 1 {
+        0x040000
+    } else {
+        0x040176 + (502 * (part_number as u32 - 2))
+    }
+}
+
+pub fn mute_part(number: u8) -> D110SysEx {
+    let mut sys_ex = D110SysEx::new();
+
+    let a = address_of(number);
+    let a_vec = vec![(a >> 16) as u8, ((a >> 8) & 0xFF) as u8, (a & 0xFF) as u8];
+
+    sys_ex.data_vec_u8(a_vec); // address
+    sys_ex.data_str("mute");
+    sys_ex.data_u8(number + 0x30);
+    sys_ex.data_vec_u8([0x20; 5].to_vec());
+
+    sys_ex
+}
 
 
