@@ -6,9 +6,18 @@ mod d110;
 mod utils;
 mod modulation;
 
-use crate::modulation::{SysExComposer, Selector, Updater};
+use crate::modulation::{
+    SysExComposer,
+    Selector,
+    SweepState,
+    Updater
+};
 use crate::d110::{init_d110, init_timbre};
-use crate::korg::{CHANNEL, KorgProgramSysEx};
+use crate::korg::{
+    KorgProgramSysEx,
+    KorgInitSysEx,
+    KorgSingleParamSysEx
+};
 use crate::midi::{MidiMessage, MidiOut, MidiOutDevices};
 use std::{
     f32,
@@ -18,50 +27,6 @@ use std::{
     sync::mpsc
 };
 use rand::prelude::SliceRandom;
-
-
-struct KorgInitSysEx {
-    data: [u8; 8]
-}
-
-impl KorgInitSysEx {
-    fn new(mode: u8) -> KorgInitSysEx {
-        KorgInitSysEx {
-            data: [0xF0,
-                   0x42, // ID of Korg
-                   0x30 | CHANNEL, // format ID (3), channel
-                   0x36, // 05R/W ID
-                   0x4E, // mode change
-                   mode,
-                   0x00,
-                   0xF7]
-        }
-    }
-}
-
-struct KorgSingleParamSysEx {
-    data: [u8; 10]
-}
-
-
-impl KorgSingleParamSysEx {
-    fn new(p: u8, v: u8) -> KorgSingleParamSysEx {
-        KorgSingleParamSysEx {
-            data: [0xF0,
-                   0x42, // ID of Korg
-                   0x30 | CHANNEL, // format ID (3), channel
-                   0x36, // 05R/W ID
-                   0x41, // parameter change
-                   p & 0x7F, // lsb parameter #
-                   (p >> 7) & 0x7F, // msb
-                   v & 0x7F, // lsb value
-                   (v >> 7) & 0x7F, // msb
-                   0xF7]
-        }
-    }
-}
-
-
 
 
 const ENV_TIME_LOW: i8 = 1;
@@ -265,32 +230,6 @@ impl <'a>Selector for KorgEffectSelector<'a> {
 }
 
 
-struct SweepState {
-    val: i8,
-    prev_val: i8,
-    freq_hz: f32
-}
-
-impl SweepState {
-    fn from(val: i8, freq_hz: f32) -> SweepState {
-        SweepState {
-            val, prev_val: val, freq_hz
-        }
-    }
-
-    fn updated_from(previous: &SweepState, val: i8) -> SweepState {
-        SweepState {
-            val, prev_val: previous.val, freq_hz: previous.freq_hz
-        }
-    }
-}
-
-impl Clone for SweepState {
-    fn clone(&self) -> Self {
-        SweepState { val: self.val, prev_val: self.prev_val, freq_hz: self.freq_hz }
-    }
-}
-
 fn random_frequency() -> f32 {
     let r = rand::random::<f64>();
     0.01 + (r / 100.0) as f32
@@ -466,7 +405,7 @@ fn main() {
         midi_out.send_sys_ex(&kssx.data);
     }
 
-    midi_out.send(&MidiMessage::program(33, CHANNEL));
+    midi_out.send(&MidiMessage::program(33, korg::CHANNEL));
     thread::sleep(Duration::from_millis(100));
 
     {

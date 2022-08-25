@@ -47,3 +47,45 @@ impl SysExComposer for KorgProgramSysEx {
         }
     }
 }
+
+
+pub struct KorgInitSysEx {
+    pub data: [u8; 8]
+}
+
+impl KorgInitSysEx {
+    pub fn new(mode: u8) -> KorgInitSysEx {
+        KorgInitSysEx {
+            data: [0xF0,
+                   0x42, // ID of Korg
+                   0x30 | CHANNEL, // format ID (3), channel
+                   0x36, // 05R/W ID
+                   0x4E, // mode change
+                   mode,
+                   0x00,
+                   0xF7]
+        }
+    }
+}
+
+pub struct KorgSingleParamSysEx {
+    pub data: [u8; 10]
+}
+
+
+impl KorgSingleParamSysEx {
+    pub fn new(p: u8, v: u8) -> KorgSingleParamSysEx {
+        KorgSingleParamSysEx {
+            data: [0xF0,
+                   0x42, // ID of Korg
+                   0x30 | CHANNEL, // format ID (3), channel
+                   0x36, // 05R/W ID
+                   0x41, // parameter change
+                   p & 0x7F, // lsb parameter #
+                   (p >> 7) & 0x7F, // msb
+                   v & 0x7F, // lsb value
+                   (v >> 7) & 0x7F, // msb
+                   0xF7]
+        }
+    }
+}
