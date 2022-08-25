@@ -58,6 +58,13 @@ fn random_frequency() -> f32 {
 }
 
 
+fn next_val_from(start: &Instant, freq_hz: f32, min: i8, max: i8) -> i8 {
+    let dt = start.elapsed().as_millis() as f32;
+    let ang_freq = freq_hz * 2.0 * f32::consts::PI as f32;
+    (min as f32 + ((max as f32 - min as f32) * 0.5 * (1.0 + (dt * 0.001 * ang_freq).cos()))).round() as i8
+}
+
+
 pub fn update<'a, S: SysExComposer, O: Selector, E: Selector>(
     sys_ex: &mut S,
     sweep_state: &mut HashMap::<String, SweepState>,
@@ -81,9 +88,7 @@ pub fn update<'a, S: SysExComposer, O: Selector, E: Selector>(
                 let s = if prefix.is_none() { String::from(*key) } else { [prefix.unwrap(), *key].join("_") };
 
                 let state_val = sweep_state.entry(s).or_insert(SweepState::from(*max, freq_hz));
-                let dt = start.elapsed().as_millis() as f32;
-                let ang_freq = state_val.freq_hz * 2.0 * f32::consts::PI as f32;
-                let new_val = (*min as f32 + ((*max as f32 - *min as f32) * 0.5 * (1.0 + (dt * 0.001 * ang_freq).cos()))).round() as i8;
+                let new_val = next_val_from(&start, state_val.freq_hz, *min, *max);
                 *state_val = SweepState::updated_from(&state_val, new_val);
                 sys_ex.data(new_val);
             },
@@ -96,14 +101,10 @@ pub fn update<'a, S: SysExComposer, O: Selector, E: Selector>(
                 let osc_vol;
                 if normal {
                     let master_vol = sweep_state.entry(s).or_insert(SweepState::from(*max, vol_freq_hz));
-
-                    // as sweep
-                    let dt = start.elapsed().as_millis() as f32;
-                    let ang_freq = master_vol.freq_hz * 2.0 * f32::consts::PI as f32;
-                    osc_vol = (*max as f32 * 0.5 * (1.0 + (dt * 0.001 * ang_freq).cos())).round() as i8;
+                    osc_vol = next_val_from(&start, master_vol.freq_hz, 0, *max);
                     *master_vol = SweepState::updated_from(&master_vol, osc_vol);
                 } else {
-                    osc_vol = 99 - sweep_state.get(&s).unwrap().val;
+                    osc_vol = *max - sweep_state.get(&s).unwrap().val;
                 }
 
                 let sk_state_val = sweep_state.entry(sk).or_insert(SweepState::from(osc_vol, 0.0));
