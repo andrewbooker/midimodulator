@@ -26,19 +26,19 @@ pub trait Selector {
 }
 
 pub struct SweepState {
-    pub val: i8, // can eventually be private
-    pub prev_val: i8, // can eventually be private
-    pub freq_hz: f32 // can eventually be private
+    pub val: i8, // public so the app can print it
+    prev_val: i8,
+    freq_hz: f32
 }
 
 impl SweepState {
-    pub fn from(val: i8, freq_hz: f32) -> SweepState { // can eventually be private
+    fn from(val: i8, freq_hz: f32) -> SweepState {
         SweepState {
             val, prev_val: val, freq_hz
         }
     }
 
-    pub fn updated_from(previous: &SweepState, val: i8) -> SweepState { // can eventually be private
+    fn updated_from(previous: &SweepState, val: i8) -> SweepState {
         SweepState {
             val, prev_val: previous.val, freq_hz: previous.freq_hz
         }
