@@ -4,7 +4,9 @@ mod korg;
 mod midi;
 mod d110;
 mod utils;
+mod modulation;
 
+use crate::modulation::Updater;
 use crate::d110::{init_d110, init_timbre};
 use crate::korg::{CHANNEL, SysExComposer, KorgProgramSysEx};
 use crate::midi::{MidiMessage, MidiOut, MidiOutDevices};
@@ -60,13 +62,7 @@ impl KorgSingleParamSysEx {
 }
 
 
-enum Updater<'a> {
-    Const(&'a str, i8),
-    PairedInverseConst(&'a str, i8),
-    Sweep(&'a str, i8, i8),
-    PairedInverseSweep(&'a str, i8),
-    SelectOnZero(&'a str, &'a str, bool)
-}
+
 
 const ENV_TIME_LOW: i8 = 1;
 const ENV_TIME_HIGH: i8 = 10;
