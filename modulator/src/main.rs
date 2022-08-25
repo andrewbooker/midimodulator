@@ -6,7 +6,7 @@ mod d110;
 mod utils;
 mod modulation;
 
-use crate::modulation::{SysExComposer, EffectSelector, Updater};
+use crate::modulation::{SysExComposer, Selector, Updater};
 use crate::d110::{init_d110, init_timbre};
 use crate::korg::{CHANNEL, KorgProgramSysEx};
 use crate::midi::{MidiMessage, MidiOut, MidiOutDevices};
@@ -250,13 +250,17 @@ impl <'a>KorgEffectSelector<'a> {
 }
 
 
-impl <'a>EffectSelector for KorgEffectSelector<'a> {
+impl <'a>Selector for KorgEffectSelector<'a> {
     fn next1(&mut self) {
         self.eff1 = &AVAILABLE_EFFECTS.choose(&mut rand::thread_rng()).unwrap();
     }
 
     fn next2(&mut self) {
         self.eff2 = &AVAILABLE_EFFECTS.choose(&mut rand::thread_rng()).unwrap();
+    }
+
+    fn val(&self, _: u8) -> u16 {
+        0
     }
 }
 
@@ -292,58 +296,91 @@ fn random_frequency() -> f32 {
     0.01 + (r / 100.0) as f32
 }
 
-const OSCILLATOR_RANGES: [(i16, i16); 26] = [
-    (0, 10),
-    (11, 42),
-    (43, 59),
-    (61, 0),
-    (63, 0),
-    (70, 98),
-    (99, 105),
-    (106, 115),
-    (129, 0),
-    (132, 143),
-    (145, 153),
-    (155, 0),
-    (159, 0),
-    (161, 0),
-    (167, 170),
-    (171, 0),
-    (172, 173),
-    (175, 184),
-    (206, 207),
-    (209, 210),
-    (221, 226),
-    (252, 256),
-    (260, 0),
-    (268, 0),
-    (316, 333),
-    (335, 337)
-];
 
+struct KorgOscSelector {
+    osc1: u16,
+    osc2: u16
+}
 
-fn expand(a: &[(i16, i16)]) -> Vec<i16> {
-    let mut ret = Vec::new();
-    for r in a {
-        if r.1 == 0 {
-            ret.push(r.0);
-        } else {
-            for osc in r.0..(r.1 + 1) {
-                ret.push(osc);
+impl KorgOscSelector {
+    const OSCILLATOR_RANGES: [(u16, u16); 26] = [
+        (0, 10),
+        (11, 42),
+        (43, 59),
+        (61, 0),
+        (63, 0),
+        (70, 98),
+        (99, 105),
+        (106, 115),
+        (129, 0),
+        (132, 143),
+        (145, 153),
+        (155, 0),
+        (159, 0),
+        (161, 0),
+        (167, 170),
+        (171, 0),
+        (172, 173),
+        (175, 184),
+        (206, 207),
+        (209, 210),
+        (221, 226),
+        (252, 256),
+        (260, 0),
+        (268, 0),
+        (316, 333),
+        (335, 337)
+    ];
+
+    fn expand(a: &[(u16, u16)]) -> Vec<u16> {
+        let mut ret = Vec::new();
+        for r in a {
+            if r.1 == 0 {
+                ret.push(r.0);
+            } else {
+                for osc in r.0..(r.1 + 1) {
+                    ret.push(osc);
+                }
             }
         }
+        ret
     }
-    ret
+
+    fn random_osc() -> u16 {
+        *KorgOscSelector::expand(&KorgOscSelector::OSCILLATOR_RANGES).choose(&mut rand::thread_rng()).unwrap()
+    }
+
+    fn new() -> KorgOscSelector {
+        KorgOscSelector {
+            osc1: KorgOscSelector::random_osc(),
+            osc2: KorgOscSelector::random_osc()
+        }
+    }
+}
+
+impl Selector for KorgOscSelector {
+    fn next1(&mut self) {
+        self.osc1 = KorgOscSelector::random_osc();
+    }
+
+    fn next2(&mut self) {
+        self.osc2 = KorgOscSelector::random_osc();
+    }
+
+    fn val(&self, at: u8) -> u16 {
+        if at == 1 {
+            self.osc1
+        } else {
+            self.osc2
+        }
+    }
 }
 
 
-fn random_osc() -> i16 {
-    *expand(&OSCILLATOR_RANGES).choose(&mut rand::thread_rng()).unwrap()
-}
-
-fn update<'a, S: SysExComposer, E: EffectSelector>(kpsx: &mut S,
+fn update<'a, S: SysExComposer, O: Selector, E: Selector>(
+    sys_ex: &mut S,
     sweep_state: &mut HashMap::<String, SweepState>,
-    selector_state: &mut HashMap::<String, i16>,
+    osc_selector: &mut O,
     effect_selector: &mut E,
     updaters: &'a [Updater],
     start: &Instant,
@@ -352,11 +389,11 @@ fn update<'a, S: SysExComposer, E: EffectSelector>(kpsx: &mut S,
     for u in updaters {
         match u {
             Updater::Const(_, c) => {
-                kpsx.data(*c);
+                sys_ex.data(*c);
             },
             Updater::PairedInverseConst(_, c) => {
                 let inverse = '2' == prefix.unwrap().chars().last().unwrap();
-                kpsx.data(if inverse { *c } else { 0 });
+                sys_ex.data(if inverse { *c } else { 0 });
             },
             Updater::Sweep(key, min, max) => {
                 let freq_hz = random_frequency();
@@ -367,7 +404,7 @@ fn update<'a, S: SysExComposer, E: EffectSelector>(kpsx: &mut S,
                 let ang_freq = state_val.freq_hz * 2.0 * f32::consts::PI as f32;
                 let new_val = (*min as f32 + ((*max as f32 - *min as f32) * 0.5 * (1.0 + (dt * 0.001 * ang_freq).cos()))).round() as i8;
                 *state_val = SweepState::updated_from(&state_val, new_val);
-                kpsx.data(new_val);
+                sys_ex.data(new_val);
             },
             Updater::PairedInverseSweep(key, max) => {
                 let vol_freq_hz = random_frequency();
@@ -390,27 +427,30 @@ fn update<'a, S: SysExComposer, E: EffectSelector>(kpsx: &mut S,
 
                 let sk_state_val = sweep_state.entry(sk).or_insert(SweepState::from(osc_vol, 0.0));
                 *sk_state_val = SweepState::updated_from(&sk_state_val, osc_vol);
-                kpsx.data(osc_vol);
+                sys_ex.data(osc_vol);
             },
             Updater::SelectOnZero(key, watching, double_byte) => {
-                let s = if prefix.is_none() { String::from(*key) } else { [prefix.unwrap(), *key].join("_") };
                 let w = String::from(*watching);
+                let idx: u8 = key.chars().last().unwrap().to_digit(10).unwrap() as u8;
 
-                let state_val = selector_state.entry(s).or_insert(random_osc());
                 if sweep_state.contains_key(&w) {
                     let ss = sweep_state.get(&w).unwrap();
                     if ss.val == 0 && ss.prev_val != 0 {
-                        *state_val = random_osc();
-                        println!("osc change {}", *state_val);
-                        
-                        if '1' == key.chars().last().unwrap() {
+                        if 1 == idx {
+                            osc_selector.next1();
                             effect_selector.next1();
                         } else {
+                            osc_selector.next2();
                             effect_selector.next2();
                         }
+                        println!("{} change {}", key, osc_selector.val(idx));
                     }
                 }
-                if *double_byte { kpsx.data_double_byte(*state_val) } else { kpsx.data(*state_val as i8) };
+                if *double_byte {
+                    sys_ex.data_double_byte(osc_selector.val(idx) as i16)
+                } else {
+                    sys_ex.data(osc_selector.val(idx) as i8)
+                };
             }
         }
     }
@@ -465,8 +505,8 @@ fn main() {
                     .expect("Failed to open port");
 
         let mut sweep_state = HashMap::<String, SweepState>::new();
-        let mut selector_state = HashMap::<String, i16>::new();
         let mut effect_selector = KorgEffectSelector::new();
+        let mut osc_selector = KorgOscSelector::new();
 
         let start = Instant::now();
         let today = utils::today();
@@ -479,12 +519,12 @@ fn main() {
             let eff2_updater = &effect_selector.eff2.updater;
             let pre_eff = &effect_selector.pre_eff();
 
-            update(&mut kpsx, &mut sweep_state, &mut selector_state, &mut effect_selector, &PROGRAM_SPEC, &start, None);
-            update(&mut kpsx, &mut sweep_state, &mut selector_state, &mut effect_selector, &OSC_SPEC, &start, Some("osc1"));
-            update(&mut kpsx, &mut sweep_state, &mut selector_state, &mut effect_selector, &OSC_SPEC, &start, Some("osc2"));
-            update(&mut kpsx, &mut sweep_state, &mut selector_state, &mut effect_selector, pre_eff, &start, None);
-            update(&mut kpsx, &mut sweep_state, &mut selector_state, &mut effect_selector, eff1_updater, &start, Some("eff1"));
-            update(&mut kpsx, &mut sweep_state, &mut selector_state, &mut effect_selector, eff2_updater, &start, Some("eff2"));
+            update(&mut kpsx, &mut sweep_state, &mut osc_selector, &mut effect_selector, &PROGRAM_SPEC, &start, None);
+            update(&mut kpsx, &mut sweep_state, &mut osc_selector, &mut effect_selector, &OSC_SPEC, &start, Some("osc1"));
+            update(&mut kpsx, &mut sweep_state, &mut osc_selector, &mut effect_selector, &OSC_SPEC, &start, Some("osc2"));
+            update(&mut kpsx, &mut sweep_state, &mut osc_selector, &mut effect_selector, pre_eff, &start, None);
+            update(&mut kpsx, &mut sweep_state, &mut osc_selector, &mut effect_selector, eff1_updater, &start, Some("eff1"));
+            update(&mut kpsx, &mut sweep_state, &mut osc_selector, &mut effect_selector, eff2_updater, &start, Some("eff2"));
 
             port.write(&kpsx.data).expect("Write failed!");
             thread::sleep(Duration::from_millis(100));

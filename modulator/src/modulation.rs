@@ -15,7 +15,9 @@ pub trait SysExComposer {
     fn name(&mut self, n: &str);
 }
 
-pub trait EffectSelector {
+pub trait Selector {
     fn next1(&mut self);
     fn next2(&mut self);
+
+    fn val(&self, idx: u8) -> u16;
 }
