@@ -6,8 +6,7 @@ mod d110;
 mod utils;
 mod modulation;
 
-use crate::modulation::SysExComposer;
-use crate::modulation::Updater;
+use crate::modulation::{SysExComposer, EffectSelector, Updater};
 use crate::d110::{init_d110, init_timbre};
 use crate::korg::{CHANNEL, KorgProgramSysEx};
 use crate::midi::{MidiMessage, MidiOut, MidiOutDevices};
@@ -221,28 +220,19 @@ const AVAILABLE_EFFECTS: [Effect; 3] = [
 ];
 
 
-struct EffectSelector<'a> {
+struct KorgEffectSelector<'a> {
     eff1: &'a Effect<'a>,
     eff2: &'a Effect<'a>
 }
 
-
-impl <'a>EffectSelector<'a> {
-    fn new() -> EffectSelector<'a> {
-        EffectSelector {
+impl <'a>KorgEffectSelector<'a> {
+    fn new() -> KorgEffectSelector<'a> {
+        KorgEffectSelector {
             eff1: &AVAILABLE_EFFECTS.choose(&mut rand::thread_rng()).unwrap(),
             eff2: &AVAILABLE_EFFECTS.choose(&mut rand::thread_rng()).unwrap()
         }
     }
-    
-    fn next1(&mut self) {
-        self.eff1 = &AVAILABLE_EFFECTS.choose(&mut rand::thread_rng()).unwrap();
-    }
-    
-    fn next2(&mut self) {
-        self.eff2 = &AVAILABLE_EFFECTS.choose(&mut rand::thread_rng()).unwrap();
-    }
-    
+
     fn pre_eff(&self) -> FxUpdater<'a> {
         [
             Updater::Const("", 0),
@@ -256,6 +246,17 @@ impl <'a>EffectSelector<'a> {
             Updater::Const("pan4", 1),
             Updater::Const("eff_routing", 0x10 | 0x0F) // routing | enable
         ]  
+    }
+}
+
+
+impl <'a>EffectSelector for KorgEffectSelector<'a> {
+    fn next1(&mut self) {
+        self.eff1 = &AVAILABLE_EFFECTS.choose(&mut rand::thread_rng()).unwrap();
+    }
+
+    fn next2(&mut self) {
+        self.eff2 = &AVAILABLE_EFFECTS.choose(&mut rand::thread_rng()).unwrap();
     }
 }
 
@@ -340,10 +341,10 @@ fn random_osc() -> i16 {
     *expand(&OSCILLATOR_RANGES).choose(&mut rand::thread_rng()).unwrap()
 }
 
-fn update<'a, S: SysExComposer>(kpsx: &mut S,
+fn update<'a, S: SysExComposer, E: EffectSelector>(kpsx: &mut S,
     sweep_state: &mut HashMap::<String, SweepState>,
     selector_state: &mut HashMap::<String, i16>,
-    effect_selector: &mut EffectSelector,
+    effect_selector: &mut E,
     updaters: &'a [Updater],
     start: &Instant,
     prefix: Option<&str>)
@@ -404,10 +405,8 @@ fn update<'a, S: SysExComposer>(kpsx: &mut S,
                         
                         if '1' == key.chars().last().unwrap() {
                             effect_selector.next1();
-                            println!("eff1 change {}", effect_selector.eff1.number);
                         } else {
                             effect_selector.next2();
-                            println!("eff2 change {}", effect_selector.eff2.number);
                         }
                     }
                 }
@@ -467,7 +466,7 @@ fn main() {
 
         let mut sweep_state = HashMap::<String, SweepState>::new();
         let mut selector_state = HashMap::<String, i16>::new();
-        let mut effect_selector = EffectSelector::new();
+        let mut effect_selector = KorgEffectSelector::new();
 
         let start = Instant::now();
         let today = utils::today();

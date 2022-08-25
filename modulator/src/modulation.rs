@@ -14,3 +14,8 @@ pub trait SysExComposer {
     fn data_double_byte(&mut self, d: i16);
     fn name(&mut self, n: &str);
 }
+
+pub trait EffectSelector {
+    fn next1(&mut self);
+    fn next2(&mut self);
+}
