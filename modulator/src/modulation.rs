@@ -64,73 +64,84 @@ fn next_val_from(start: &Instant, freq_hz: f32, min: i8, max: i8) -> i8 {
     (min as f32 + ((max as f32 - min as f32) * 0.5 * (1.0 + (dt * 0.001 * ang_freq).cos()))).round() as i8
 }
 
+pub struct PairedUpdater {
+    pub sweep_state: HashMap::<String, SweepState>
+}
 
-pub fn update<'a, S: SysExComposer, O: Selector, E: Selector>(
-    sys_ex: &mut S,
-    sweep_state: &mut HashMap::<String, SweepState>,
-    osc_selector: &mut O,
-    effect_selector: &mut E,
-    updaters: &'a [Updater],
-    start: &Instant,
-    prefix: Option<&str>)
-{
-    for u in updaters {
-        match u {
-            Updater::Const(_, c) => {
-                sys_ex.data(*c);
-            },
-            Updater::PairedInverseConst(_, c) => {
-                let inverse = '2' == prefix.unwrap().chars().last().unwrap();
-                sys_ex.data(if inverse { *c } else { 0 });
-            },
-            Updater::Sweep(key, min, max) => {
-                let s = if prefix.is_none() { String::from(*key) } else { [prefix.unwrap(), *key].join("_") };
+impl PairedUpdater {
+    pub fn new() -> PairedUpdater {
+        PairedUpdater {
+            sweep_state: HashMap::<String, SweepState>::new()
+        }
+    }
 
-                let state_val = sweep_state.entry(s).or_insert(SweepState::from(*max, random_frequency()));
-                let new_val = next_val_from(&start, state_val.freq_hz, *min, *max);
-                *state_val = SweepState::updated_from(&state_val, new_val);
-                sys_ex.data(new_val);
-            },
-            Updater::PairedInverseSweep(key, max) => {
-                let s = String::from(*key);
-                let sk = [prefix.unwrap(), *key].join("_");
+    pub fn update<'a, S: SysExComposer, O: Selector, E: Selector>(
+        &mut self,
+        sys_ex: &mut S,
+        osc_selector: &mut O,
+        effect_selector: &mut E,
+        updaters: &'a [Updater],
+        start: &Instant,
+        prefix: Option<&str>)
+    {
+        for u in updaters {
+            match u {
+                Updater::Const(_, c) => {
+                    sys_ex.data(*c);
+                },
+                Updater::PairedInverseConst(_, c) => {
+                    let inverse = '2' == prefix.unwrap().chars().last().unwrap();
+                    sys_ex.data(if inverse { *c } else { 0 });
+                },
+                Updater::Sweep(key, min, max) => {
+                    let s = if prefix.is_none() { String::from(*key) } else { [prefix.unwrap(), *key].join("_") };
 
-                let normal = '1' == prefix.unwrap().chars().last().unwrap();
-                let osc_vol;
-                if normal {
-                    let master_vol = sweep_state.entry(s).or_insert(SweepState::from(*max, random_frequency()));
-                    osc_vol = next_val_from(&start, master_vol.freq_hz, 0, *max);
-                    *master_vol = SweepState::updated_from(&master_vol, osc_vol);
-                } else {
-                    osc_vol = *max - sweep_state.get(&s).unwrap().val;
-                }
+                    let state_val = self.sweep_state.entry(s).or_insert(SweepState::from(*max, random_frequency()));
+                    let new_val = next_val_from(&start, state_val.freq_hz, *min, *max);
+                    *state_val = SweepState::updated_from(&state_val, new_val);
+                    sys_ex.data(new_val);
+                },
+                Updater::PairedInverseSweep(key, max) => {
+                    let s = String::from(*key);
+                    let sk = [prefix.unwrap(), *key].join("_");
 
-                let sk_state_val = sweep_state.entry(sk).or_insert(SweepState::from(osc_vol, 0.0));
-                *sk_state_val = SweepState::updated_from(&sk_state_val, osc_vol);
-                sys_ex.data(osc_vol);
-            },
-            Updater::SelectOnZero(key, watching, double_byte) => {
-                let w = String::from(*watching);
-                let idx: u8 = key.chars().last().unwrap().to_digit(10).unwrap() as u8;
-
-                if sweep_state.contains_key(&w) {
-                    let ss = sweep_state.get(&w).unwrap();
-                    if ss.val == 0 && ss.prev_val != 0 {
-                        if 1 == idx {
-                            osc_selector.next1();
-                            effect_selector.next1();
-                        } else {
-                            osc_selector.next2();
-                            effect_selector.next2();
-                        }
-                        println!("{} change {}", key, osc_selector.val(idx));
+                    let normal = '1' == prefix.unwrap().chars().last().unwrap();
+                    let osc_vol;
+                    if normal {
+                        let master_vol = self.sweep_state.entry(s).or_insert(SweepState::from(*max, random_frequency()));
+                        osc_vol = next_val_from(&start, master_vol.freq_hz, 0, *max);
+                        *master_vol = SweepState::updated_from(&master_vol, osc_vol);
+                    } else {
+                        osc_vol = *max - self.sweep_state.get(&s).unwrap().val;
                     }
+
+                    let sk_state_val = self.sweep_state.entry(sk).or_insert(SweepState::from(osc_vol, 0.0));
+                    *sk_state_val = SweepState::updated_from(&sk_state_val, osc_vol);
+                    sys_ex.data(osc_vol);
+                },
+                Updater::SelectOnZero(key, watching, double_byte) => {
+                    let w = String::from(*watching);
+                    let idx: u8 = key.chars().last().unwrap().to_digit(10).unwrap() as u8;
+
+                    if self.sweep_state.contains_key(&w) {
+                        let ss = self.sweep_state.get(&w).unwrap();
+                        if ss.val == 0 && ss.prev_val != 0 {
+                            if 1 == idx {
+                                osc_selector.next1();
+                                effect_selector.next1();
+                            } else {
+                                osc_selector.next2();
+                                effect_selector.next2();
+                            }
+                            println!("{} change {}", key, osc_selector.val(idx));
+                        }
+                    }
+                    if *double_byte {
+                        sys_ex.data_double_byte(osc_selector.val(idx) as i16)
+                    } else {
+                        sys_ex.data(osc_selector.val(idx) as i8)
+                    };
                 }
-                if *double_byte {
-                    sys_ex.data_double_byte(osc_selector.val(idx) as i16)
-                } else {
-                    sys_ex.data(osc_selector.val(idx) as i8)
-                };
             }
         }
     }

@@ -8,8 +8,7 @@ mod modulation;
 
 use crate::modulation::{
     SysExComposer,
-    SweepState,
-    update
+    PairedUpdater
 };
 use crate::d110::{
     init_d110,
@@ -30,7 +29,6 @@ use crate::midi::{MidiMessage, MidiOut, MidiOutDevices};
 use std::{
     thread,
     time::{Duration, Instant},
-    collections::HashMap,
     sync::mpsc
 };
 
@@ -91,11 +89,11 @@ fn main() {
 
         let start = Instant::now();
         let mut p1 = set_up_part(1);
-        let mut sweep_state = HashMap::<String, SweepState>::new();
+        let mut updater = PairedUpdater::new();
         let mut dummy_1 = DummySelector::new();
         let mut dummy_2 = DummySelector::new();
-        update(&mut p1, &mut sweep_state, &mut dummy_1, &mut dummy_2, &PARTIAL_SPEC, &start, Some("partial1"));
-        for (key, val) in &sweep_state {
+        updater.update(&mut p1, &mut dummy_1, &mut dummy_2, &PARTIAL_SPEC, &start, Some("partial1"));
+        for (key, val) in &updater.sweep_state {
             println!("{}: {}", key, val.val);
         }
         d110_midi_out.send_sys_ex(&p1.to_send());
@@ -118,7 +116,7 @@ fn main() {
                     .open()
                     .expect("Failed to open port");
 
-        let mut sweep_state = HashMap::<String, SweepState>::new();
+        let mut updater = PairedUpdater::new();
         let mut effect_selector = KorgEffectSelector::new();
         let mut osc_selector = KorgOscSelector::new();
 
@@ -133,19 +131,19 @@ fn main() {
             let eff2_updater = &effect_selector.eff2.updater;
             let pre_eff = &effect_selector.pre_eff();
 
-            update(&mut kpsx, &mut sweep_state, &mut osc_selector, &mut effect_selector, &PROGRAM_SPEC, &start, None);
-            update(&mut kpsx, &mut sweep_state, &mut osc_selector, &mut effect_selector, &OSC_SPEC, &start, Some("osc1"));
-            update(&mut kpsx, &mut sweep_state, &mut osc_selector, &mut effect_selector, &OSC_SPEC, &start, Some("osc2"));
-            update(&mut kpsx, &mut sweep_state, &mut osc_selector, &mut effect_selector, pre_eff, &start, None);
-            update(&mut kpsx, &mut sweep_state, &mut osc_selector, &mut effect_selector, eff1_updater, &start, Some("eff1"));
-            update(&mut kpsx, &mut sweep_state, &mut osc_selector, &mut effect_selector, eff2_updater, &start, Some("eff2"));
+            updater.update(&mut kpsx, &mut osc_selector, &mut effect_selector, &PROGRAM_SPEC, &start, None);
+            updater.update(&mut kpsx, &mut osc_selector, &mut effect_selector, &OSC_SPEC, &start, Some("osc1"));
+            updater.update(&mut kpsx, &mut osc_selector, &mut effect_selector, &OSC_SPEC, &start, Some("osc2"));
+            updater.update(&mut kpsx, &mut osc_selector, &mut effect_selector, pre_eff, &start, None);
+            updater.update(&mut kpsx, &mut osc_selector, &mut effect_selector, eff1_updater, &start, Some("eff1"));
+            updater.update(&mut kpsx, &mut osc_selector, &mut effect_selector, eff2_updater, &start, Some("eff2"));
 
             port.write(&kpsx.data).expect("Write failed!");
             thread::sleep(Duration::from_millis(100));
 
             match cmd_dump_rx.try_recv() {
                 Ok(_) => {
-                    res_tx.send(sweep_state.clone()).unwrap();
+                    res_tx.send(updater.sweep_state.clone()).unwrap();
                 },
                 _ => {}
             }
