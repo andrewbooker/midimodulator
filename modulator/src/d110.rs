@@ -189,7 +189,7 @@ pub const PARTIAL_SPEC: [Updater; 58] = [
     Updater::Sweep("env_filter_breakPoint", 43, 57), // decay level
     Updater::Sweep("env_filter_attack2Level", 10, 90),
     Updater::Sweep("env_filter_sustainLevel", 45, 55),
-    Updater::PairedInverseSweep("vol", 99),
+    Updater::PairedInverseSweep("vol"),
     Updater::Const("amplEnvVelocityMod", 50),
     Updater::Const("amplEnvLowerBiasPoint", 0),
     Updater::Const("amplEnvLowerBiasLevel", 12),

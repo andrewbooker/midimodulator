@@ -135,6 +135,7 @@ fn main() {
             updater.update(&mut kpsx, &mut osc_selector, &mut effect_selector, pre_eff, None);
             updater.update(&mut kpsx, &mut osc_selector, &mut effect_selector, eff1_updater, Some("eff1"));
             updater.update(&mut kpsx, &mut osc_selector, &mut effect_selector, eff2_updater, Some("eff2"));
+            updater.sweep_alternator();
 
             port.write(&kpsx.data).expect("Write failed!");
             thread::sleep(Duration::from_millis(100));
