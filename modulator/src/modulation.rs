@@ -52,26 +52,30 @@ impl Clone for SweepState {
 }
 
 
-fn random_frequency() -> f32 {
-    let r = rand::random::<f64>();
-    0.01 + (r / 100.0) as f32
-}
 
 
-fn next_val_from(start: &Instant, freq_hz: f32, min: i8, max: i8) -> i8 {
-    let dt = start.elapsed().as_millis() as f32;
-    let ang_freq = freq_hz * 2.0 * f32::consts::PI as f32;
-    (min as f32 + ((max as f32 - min as f32) * 0.5 * (1.0 + (dt * 0.001 * ang_freq).cos()))).round() as i8
-}
 
 pub struct PairedUpdater {
-    pub sweep_state: HashMap::<String, SweepState>
+    pub sweep_state: HashMap::<String, SweepState>,
+    start: Instant
 }
 
 impl PairedUpdater {
+    fn random_frequency() -> f32 {
+        let r = rand::random::<f64>();
+        0.01 + (r / 100.0) as f32
+    }
+
+    fn next_val_from(start: &Instant, freq_hz: f32, min: i8, max: i8) -> i8 {
+        let dt = start.elapsed().as_millis() as f32;
+        let ang_freq = freq_hz * 2.0 * f32::consts::PI as f32;
+        (min as f32 + ((max as f32 - min as f32) * 0.5 * (1.0 + (dt * 0.001 * ang_freq).cos()))).round() as i8
+    }
+
     pub fn new() -> PairedUpdater {
         PairedUpdater {
-            sweep_state: HashMap::<String, SweepState>::new()
+            sweep_state: HashMap::<String, SweepState>::new(),
+            start: Instant::now()
         }
     }
 
@@ -81,7 +85,6 @@ impl PairedUpdater {
         osc_selector: &mut O,
         effect_selector: &mut E,
         updaters: &'a [Updater],
-        start: &Instant,
         prefix: Option<&str>)
     {
         for u in updaters {
@@ -96,8 +99,8 @@ impl PairedUpdater {
                 Updater::Sweep(key, min, max) => {
                     let s = if prefix.is_none() { String::from(*key) } else { [prefix.unwrap(), *key].join("_") };
 
-                    let state_val = self.sweep_state.entry(s).or_insert(SweepState::from(*max, random_frequency()));
-                    let new_val = next_val_from(&start, state_val.freq_hz, *min, *max);
+                    let state_val = self.sweep_state.entry(s).or_insert(SweepState::from(*max, PairedUpdater::random_frequency()));
+                    let new_val = PairedUpdater::next_val_from(&self.start, state_val.freq_hz, *min, *max);
                     *state_val = SweepState::updated_from(&state_val, new_val);
                     sys_ex.data(new_val);
                 },
@@ -108,8 +111,8 @@ impl PairedUpdater {
                     let normal = '1' == prefix.unwrap().chars().last().unwrap();
                     let osc_vol;
                     if normal {
-                        let master_vol = self.sweep_state.entry(s).or_insert(SweepState::from(*max, random_frequency()));
-                        osc_vol = next_val_from(&start, master_vol.freq_hz, 0, *max);
+                        let master_vol = self.sweep_state.entry(s).or_insert(SweepState::from(*max, PairedUpdater::random_frequency()));
+                        osc_vol = PairedUpdater::next_val_from(&self.start, master_vol.freq_hz, 0, *max);
                         *master_vol = SweepState::updated_from(&master_vol, osc_vol);
                     } else {
                         osc_vol = *max - self.sweep_state.get(&s).unwrap().val;

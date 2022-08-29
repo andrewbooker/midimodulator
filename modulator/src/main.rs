@@ -28,7 +28,7 @@ use crate::korg::{
 use crate::midi::{MidiMessage, MidiOut, MidiOutDevices};
 use std::{
     thread,
-    time::{Duration, Instant},
+    time::Duration,
     sync::mpsc
 };
 
@@ -87,12 +87,11 @@ fn main() {
         }
         println!("D110 init sent");
 
-        let start = Instant::now();
         let mut p1 = set_up_part(1);
         let mut updater = PairedUpdater::new();
         let mut dummy_1 = DummySelector::new();
         let mut dummy_2 = DummySelector::new();
-        updater.update(&mut p1, &mut dummy_1, &mut dummy_2, &PARTIAL_SPEC, &start, Some("partial1"));
+        updater.update(&mut p1, &mut dummy_1, &mut dummy_2, &PARTIAL_SPEC, Some("partial1"));
         for (key, val) in &updater.sweep_state {
             println!("{}: {}", key, val.val);
         }
@@ -120,7 +119,6 @@ fn main() {
         let mut effect_selector = KorgEffectSelector::new();
         let mut osc_selector = KorgOscSelector::new();
 
-        let start = Instant::now();
         let today = utils::today();
 
         loop {
@@ -131,12 +129,12 @@ fn main() {
             let eff2_updater = &effect_selector.eff2.updater;
             let pre_eff = &effect_selector.pre_eff();
 
-            updater.update(&mut kpsx, &mut osc_selector, &mut effect_selector, &PROGRAM_SPEC, &start, None);
-            updater.update(&mut kpsx, &mut osc_selector, &mut effect_selector, &OSC_SPEC, &start, Some("osc1"));
-            updater.update(&mut kpsx, &mut osc_selector, &mut effect_selector, &OSC_SPEC, &start, Some("osc2"));
-            updater.update(&mut kpsx, &mut osc_selector, &mut effect_selector, pre_eff, &start, None);
-            updater.update(&mut kpsx, &mut osc_selector, &mut effect_selector, eff1_updater, &start, Some("eff1"));
-            updater.update(&mut kpsx, &mut osc_selector, &mut effect_selector, eff2_updater, &start, Some("eff2"));
+            updater.update(&mut kpsx, &mut osc_selector, &mut effect_selector, &PROGRAM_SPEC, None);
+            updater.update(&mut kpsx, &mut osc_selector, &mut effect_selector, &OSC_SPEC, Some("osc1"));
+            updater.update(&mut kpsx, &mut osc_selector, &mut effect_selector, &OSC_SPEC, Some("osc2"));
+            updater.update(&mut kpsx, &mut osc_selector, &mut effect_selector, pre_eff, None);
+            updater.update(&mut kpsx, &mut osc_selector, &mut effect_selector, eff1_updater, Some("eff1"));
+            updater.update(&mut kpsx, &mut osc_selector, &mut effect_selector, eff2_updater, Some("eff2"));
 
             port.write(&kpsx.data).expect("Write failed!");
             thread::sleep(Duration::from_millis(100));
