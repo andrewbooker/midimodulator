@@ -70,14 +70,18 @@ fn to_string(s: *const c_char) -> String {
 
 pub struct MidiOutDevices;
 impl MidiOutDevices {
-    pub fn list() {
+    pub fn index_of(substr: &str) -> Option<i32> {
         let n = unsafe { Pm_CountDevices() };
         for d in 0..n {
             let info_ptr = unsafe { Pm_GetDeviceInfo(d) };
             if 1 == unsafe { (*info_ptr).output } {
-                println!("{} {} can output", d, to_string(unsafe { (*info_ptr).name }));
+                let name = to_string(unsafe { (*info_ptr).name }).to_lowercase();
+                if name.contains(&substr.to_lowercase()) {
+                    return Some(d);
+                }
             }
         }
+        None
     }
 }
 

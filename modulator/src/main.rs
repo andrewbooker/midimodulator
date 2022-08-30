@@ -52,9 +52,12 @@ impl Selector for DummySelector {
 
 
 fn main() {
-    MidiOutDevices::list();
+    let edirol = MidiOutDevices::index_of("edirol").unwrap();
+    let usb = MidiOutDevices::index_of("usb").unwrap();
+    println!("EDIROL (D110) port {}", edirol);
+    println!("USB (korg) port {}", usb);
 
-    let mut midi_out = MidiOut::using_device(2);
+    let mut midi_out = MidiOut::using_device(usb);
     {
         let kssx = KorgInitSysEx::new(0x02); // select prog
         midi_out.send_sys_ex(&kssx.data);
@@ -74,7 +77,7 @@ fn main() {
     }
 
     {
-        let mut d110_midi_out = MidiOut::using_device(4);
+        let mut d110_midi_out = MidiOut::using_device(edirol);
         let d110_init = init_d110();
         d110_midi_out.send_sys_ex(&d110_init.to_send());
         for t in 1..9 {
