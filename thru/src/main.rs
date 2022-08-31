@@ -106,15 +106,15 @@ impl SimpleThru {
         let t = SimpleThru {
             midi_out: RtMidiOut::new(Default::default()).unwrap()
         };
-        t.midi_out.open_port(d, "SimpleThru out");
+        t.midi_out.open_port(d, "SimpleThru out").unwrap();
         t
     }
 }
 
 impl MidiNoteSink for SimpleThru {
     fn receive(&self, n: &Note, _stats: &mut NoteStats) {
-        self.midi_out.message(&[0x90, n.note, n.velocity]);
-        self.midi_out.message(&[0x80, n.note, 0]);
+        self.midi_out.message(&[0x90, n.note, n.velocity]).unwrap();
+        self.midi_out.message(&[0x80, n.note, 0]).unwrap();
     }
 }
 
@@ -134,19 +134,18 @@ struct Scale {
 
 impl Scale {
     fn from(tonic: u8, mode: &Mode) -> Scale {
-        let modeLen: u8 = mode.len() as u8;
-        const scaleLen: u8 = SCALE_LENGTH as u8;
+        let mode_len: u8 = mode.len() as u8;
 
         let mut notes = [0; SCALE_LENGTH];
         let mut octaves: u8 = 0;
         let mut base: u8 = tonic;
 
-        for n in 0..scaleLen {
-            if (n % (modeLen + 1)) == 0 {
+        for n in 0..SCALE_LENGTH as u8 {
+            if (n % (mode_len + 1)) == 0 {
                 base = tonic + (octaves * 12) as u8;
                 octaves += 1;
             } else {
-                let idx = (n - octaves) % modeLen;
+                let idx = (n - octaves) % mode_len;
                 base += mode[idx as usize];
             }
             notes[n as usize] = base;
@@ -226,11 +225,17 @@ struct HoldingThru {
 }
 
 impl HoldingThru {
-    pub fn using_device(d: u32) -> HoldingThru {
+    pub fn using_device(substr: &str) -> HoldingThru {
         let t = HoldingThru {
             midi_out: RtMidiOut::new(Default::default()).unwrap()
         };
-        t.midi_out.open_port(d, "HoldingThru out");
+        for port in 0..t.midi_out.port_count().unwrap() {
+            let name = t.midi_out.port_name(port).unwrap();
+            if name.to_lowercase().contains(&substr.to_lowercase()) {
+                println!("found output port {} for {} ({})", port, substr, name);
+                t.midi_out.open_port(port, "HoldingThru out").unwrap();
+            }
+        }
         t
     }
 }
@@ -239,11 +244,11 @@ impl MidiNoteSink for HoldingThru {
     fn receive(&self, n: &Note, stats: &mut NoteStats) {
         if !stats.last_sent().is_none() {
             let ls = stats.last_sent().unwrap();
-            self.midi_out.message(&[0x80, ls, 0]);
+            self.midi_out.message(&[0x80, ls, 0]).unwrap();
         }
 
         if stats.last_sent().is_none() || stats.last_sent().unwrap() != n.note {
-            self.midi_out.message(&[0x90, n.note, n.velocity]);
+            self.midi_out.message(&[0x90, n.note, n.velocity]).unwrap();
             stats.put_sent(&n);
         } else {
             stats.clear();
@@ -253,9 +258,21 @@ impl MidiNoteSink for HoldingThru {
 
 impl Drop for HoldingThru {
     fn drop(&mut self) {
-        self.midi_out.message(&[0xB0, 0x7B, 0]);
+        self.midi_out.message(&[0xB0, 0x7B, 0]).unwrap();
         println!("HoldingThru closed");
     }
+}
+
+
+fn index_of(substr: &str, input: &RtMidiIn) -> u32 {
+    for port in 0..input.port_count().unwrap() {
+        let name = input.port_name(port).unwrap();
+        if name.to_lowercase().contains(&substr.to_lowercase()) {
+            println!("found input port {} for {}", port, substr);
+            return port;
+        }
+    }
+    0
 }
 
 fn main() -> Result<(), RtMidiError> {
@@ -266,11 +283,12 @@ fn main() -> Result<(), RtMidiError> {
     for port in 0..input_ports {
         println!("Input {}: {}", port + 1, input.port_name(port)?);
     }
+    let korg_port = index_of("USB", &input);
 
-    input.open_port(2, "RtMidi Input")?;
+    input.open_port(korg_port, "RtMidi Input")?;
 
     let stats = Mutex::new(NoteStats::new());
-    let hold = HoldingThru::using_device(2);
+    let hold = HoldingThru::using_device("USB");
     let scale = Scale::from(48, &LYDIAN);
     let oct = RandomOctaveStage::to(&hold);
     let mapper = NoteMapThru::to(&scale, &oct);
