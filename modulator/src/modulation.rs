@@ -1,5 +1,4 @@
 use std::f32;
-use std::time::Instant;
 use std::collections::HashMap;
 
 
@@ -56,30 +55,12 @@ pub trait StepInterval {
     fn interval(&self) -> f32;
 }
 
-struct TimeBasedInterval {
-    start: Instant
-}
-
-impl TimeBasedInterval {
-    fn new() -> TimeBasedInterval {
-        TimeBasedInterval {
-            start: Instant::now()
-        }
-    }
-}
-
-impl StepInterval for TimeBasedInterval {
-    fn interval(&self) -> f32 {
-        self.start.elapsed().as_millis() as f32
-    }
-}
-
-pub struct PairedUpdater {
+pub struct PairedUpdater<'a> {
     pub sweep_state: HashMap::<String, SweepState>,
-    interval: Box<dyn StepInterval>
+    interval: &'a dyn StepInterval
 }
 
-impl PairedUpdater {
+impl PairedUpdater<'_> {
     const ALTERNATOR: &'static str = "alternator";
     const ALTERNATOR_MAX: i8 = 99;
 
@@ -98,10 +79,10 @@ impl PairedUpdater {
         (min as f32 + ((max as f32 - min as f32) * 0.5 * (1.0 + (dt * 0.001 * ang_freq).cos()))).round() as i8
     }
 
-    pub fn new() -> PairedUpdater {
+    pub fn new(interval: &dyn StepInterval) -> PairedUpdater {
         let mut p = PairedUpdater {
             sweep_state: HashMap::<String, SweepState>::new(),
-            interval: Box::new(TimeBasedInterval::new())
+            interval
         };
         p.sweep_state.insert(PairedUpdater::ALTERNATOR.to_string(), SweepState::from(PairedUpdater::random_between(0, PairedUpdater::ALTERNATOR_MAX), PairedUpdater::random_frequency()));
         p

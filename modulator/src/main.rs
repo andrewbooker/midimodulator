@@ -8,7 +8,8 @@ mod modulation;
 
 use crate::modulation::{
     SysExComposer,
-    PairedUpdater
+    PairedUpdater,
+    StepInterval
 };
 use crate::d110::{
     init_d110,
@@ -28,7 +29,7 @@ use crate::korg::{
 use crate::midi::{MidiMessage, MidiOut, MidiOutDevices};
 use std::{
     thread,
-    time::Duration,
+    time::{Duration, Instant},
     sync::mpsc
 };
 
@@ -51,11 +52,32 @@ impl Selector for DummySelector {
 }
 
 
+struct TimeBasedInterval {
+    start: Instant
+}
+
+impl TimeBasedInterval {
+    fn new() -> TimeBasedInterval {
+        TimeBasedInterval {
+            start: Instant::now()
+        }
+    }
+}
+
+impl StepInterval for TimeBasedInterval {
+    fn interval(&self) -> f32 {
+        self.start.elapsed().as_millis() as f32
+    }
+}
+
+
 fn main() {
     let edirol = MidiOutDevices::index_of("edirol").unwrap();
     let usb = MidiOutDevices::index_of("usb").unwrap();
     println!("EDIROL (D110) port {}", edirol);
     println!("USB (korg) port {}", usb);
+
+    let interval = TimeBasedInterval::new();
 
     let mut midi_out = MidiOut::using_device(usb);
     {
@@ -91,7 +113,7 @@ fn main() {
         println!("D110 init sent");
 
         let mut p1 = set_up_part(1);
-        let mut updater = PairedUpdater::new();
+        let mut updater = PairedUpdater::new(&interval);
         let mut dummy_1 = DummySelector::new();
         let mut dummy_2 = DummySelector::new();
         updater.update(&mut p1, &mut dummy_1, &mut dummy_2, &PARTIAL_SPEC, Some("partialA_1"));
@@ -122,7 +144,7 @@ fn main() {
                     .open()
                     .expect("Failed to open port");
 
-        let mut updater = PairedUpdater::new();
+        let mut updater = PairedUpdater::new(&interval);
         let mut effect_selector = KorgEffectSelector::new();
         let mut osc_selector = KorgOscSelector::new();
 
