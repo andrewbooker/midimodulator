@@ -71,13 +71,27 @@ impl StepInterval for TimeBasedInterval {
 }
 
 
+fn update_d110(updater: &mut PairedUpdater, d110_midi_out: &mut MidiOut) {
+    let mut dummy_1 = DummySelector::new();
+    let mut dummy_2 = DummySelector::new();
+    let mut p1 = set_up_part(1);
+
+    updater.update(&mut p1, &mut dummy_1, &mut dummy_2, &PARTIAL_SPEC, Some("partialA_1"));
+    updater.update(&mut p1, &mut dummy_1, &mut dummy_2, &PARTIAL_SPEC, Some("partialB_3"));
+    updater.update(&mut p1, &mut dummy_1, &mut dummy_2, &PARTIAL_SPEC, Some("partialC_2"));
+    updater.update(&mut p1, &mut dummy_1, &mut dummy_2, &PARTIAL_SPEC, Some("partialD_4"));
+    updater.sweep_alternator();
+    for (key, val) in &updater.sweep_state {
+        println!("{}: {}", key, val.val);
+    }
+    d110_midi_out.send_sys_ex(&p1.to_send());
+}
+
 fn main() {
     let edirol = MidiOutDevices::index_of("edirol").unwrap();
     let usb = MidiOutDevices::index_of("usb").unwrap();
     println!("EDIROL (D110) port {}", edirol);
     println!("USB (korg) port {}", usb);
-
-    let interval = TimeBasedInterval::new();
 
     let mut midi_out = MidiOut::using_device(usb);
     {
@@ -98,7 +112,8 @@ fn main() {
         midi_out.send_sys_ex(&kssx.data);
     }
 
-    {
+    thread::spawn(move || {
+        let interval = TimeBasedInterval::new();
         let mut d110_midi_out = MidiOut::using_device(edirol);
         let d110_init = init_d110();
         d110_midi_out.send_sys_ex(&d110_init.to_send());
@@ -112,22 +127,12 @@ fn main() {
         }
         println!("D110 init sent");
 
-        let mut p1 = set_up_part(1);
         let mut updater = PairedUpdater::new(&interval);
-        let mut dummy_1 = DummySelector::new();
-        let mut dummy_2 = DummySelector::new();
-        updater.update(&mut p1, &mut dummy_1, &mut dummy_2, &PARTIAL_SPEC, Some("partialA_1"));
-        updater.update(&mut p1, &mut dummy_1, &mut dummy_2, &PARTIAL_SPEC, Some("partialB_3"));
-        updater.update(&mut p1, &mut dummy_1, &mut dummy_2, &PARTIAL_SPEC, Some("partialC_2"));
-        updater.update(&mut p1, &mut dummy_1, &mut dummy_2, &PARTIAL_SPEC, Some("partialD_4"));
-        updater.sweep_alternator();
-        for (key, val) in &updater.sweep_state {
-            println!("{}: {}", key, val.val);
-        }
-        d110_midi_out.send_sys_ex(&p1.to_send());
+
+        update_d110(&mut updater, &mut d110_midi_out);
 
         println!("part1 updated");
-    }
+    });
 
     let ports = serialport::available_ports().expect("No ports found!");
     for p in ports {
@@ -144,6 +149,7 @@ fn main() {
                     .open()
                     .expect("Failed to open port");
 
+        let interval = TimeBasedInterval::new();
         let mut updater = PairedUpdater::new(&interval);
         let mut effect_selector = KorgEffectSelector::new();
         let mut osc_selector = KorgOscSelector::new();
