@@ -30,7 +30,9 @@ use crate::midi::{MidiMessage, MidiOut, MidiOutDevices};
 use std::{
     thread,
     time::{Duration, Instant},
-    sync::mpsc
+    sync::mpsc,
+    io::{prelude::*, BufReader},
+    net::{TcpListener}
 };
 
 
@@ -113,7 +115,6 @@ fn main() {
     }
 
     thread::spawn(move || {
-        let interval = TimeBasedInterval::new();
         let mut d110_midi_out = MidiOut::using_device(edirol);
         let d110_init = init_d110();
         d110_midi_out.send_sys_ex(&d110_init.to_send());
@@ -127,11 +128,33 @@ fn main() {
         }
         println!("D110 init sent");
 
+        let listener = TcpListener::bind("0.0.0.0:7878").unwrap();
+        println!("tcp listener started on port 7878");
+
+        let interval = TimeBasedInterval::new();
         let mut updater = PairedUpdater::new(&interval);
+        for stream in listener.incoming() {
+            let mut stream = stream.unwrap();
+            let buf_reader = BufReader::new(&mut stream);
+            let http_request: Vec<_> = buf_reader
+                .lines()
+                .map(|result| result.unwrap())
+                .take_while(|line| !line.is_empty())
+                .collect();
 
-        update_d110(&mut updater, &mut d110_midi_out);
+            println!("Request: {:#?}", http_request);
 
-        println!("part1 updated");
+            update_d110(&mut updater, &mut d110_midi_out);
+            println!("part1 updated");
+
+            let status_line = "HTTP/1.1 200 OK";
+            let contents = json::stringify(vec![0]);
+            let length = contents.len();
+
+            let response = format!("{status_line}\r\nContent-Type: application/json; charset=UTF-8\r\nContent-Length: {length}\r\n\r\n{contents}");
+
+            stream.write_all(response.as_bytes()).unwrap();
+        }
     });
 
     let ports = serialport::available_ports().expect("No ports found!");
