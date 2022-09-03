@@ -194,12 +194,16 @@ impl <'a, S: MidiNoteSink>MidiNoteSink for NoteMapThru<'a, S> {
 // RandomOctaveStage
 
 struct RandomOctaveStage<'a, S: MidiNoteSink> {
+    octave_range: u8,
+    base: i8,
     next: &'a S
 }
 
 impl <'a, S: MidiNoteSink>RandomOctaveStage<'a, S> {
-    pub fn to(next: &'a S) -> RandomOctaveStage<'a, S> {
+    pub fn to(octave_range: u8, base: i8, next: &'a S) -> RandomOctaveStage<'a, S> {
         RandomOctaveStage::<'a, S> {
+            octave_range,
+            base,
             next
         }
     }
@@ -208,7 +212,7 @@ impl <'a, S: MidiNoteSink>RandomOctaveStage<'a, S> {
 impl <'a, S: MidiNoteSink>MidiNoteSink for RandomOctaveStage<'a, S> {
     fn receive(&self, n: &Note, stats: &mut NoteStats) {
         let r = rand::random::<f64>();
-        let o = ((r * 4.0) as i8) - 1;
+        let o = ((r * self.octave_range as f64) as i8) + self.base;
         let transposed = Note {
             note: (n.note as i8 + (12 * o)) as u8,
             velocity: n.velocity
@@ -216,7 +220,6 @@ impl <'a, S: MidiNoteSink>MidiNoteSink for RandomOctaveStage<'a, S> {
         self.next.receive(&transposed, stats);
     }
 }
-
 
 // HoldingThru
 
@@ -290,7 +293,7 @@ fn main() -> Result<(), RtMidiError> {
     let stats = Mutex::new(NoteStats::new());
     let hold = HoldingThru::using_device("USB");
     let scale = Scale::from(48, &LYDIAN);
-    let oct = RandomOctaveStage::to(&hold);
+    let oct = RandomOctaveStage::to(4, -1, &hold);
     let mapper = NoteMapThru::to(&scale, &oct);
     let sink = InputRegister::then(&mapper);
 
