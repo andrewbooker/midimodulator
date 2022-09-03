@@ -294,15 +294,34 @@ fn main() -> Result<(), RtMidiError> {
     let mapper = NoteMapThru::to(&scale, &oct);
     let sink = InputRegister::then(&mapper);
 
+    let (midi_in_tx, midi_in_rx) = mpsc::channel();
     input.set_callback(|_timestamp, message| {
         if message[0] == 0x90 && message[2] != 0 {
             let n = Note::from_midi_message(&message);
             let mut s = stats.lock().unwrap();
             sink.receive(&n, &mut s);
+            midi_in_tx.send(n.note).unwrap();
         }
     })?;
 
     input.ignore_types(true, true, true)?;
+
+    thread::spawn(move || {
+        let client = reqwest::blocking::Client::new();
+        loop {
+            match midi_in_rx.try_recv() {
+                Ok(_) => {
+                    println!("{:?}", midi_in_rx);
+
+                    let res = client.post("http://localhost:7878")
+                                .body("{}")
+                                .send().unwrap();
+                    println!("{:?}", res);
+                },
+                _ => {}
+            }
+        }
+    });
 
     println!("Starting...");
 
