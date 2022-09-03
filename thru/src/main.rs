@@ -168,7 +168,6 @@ struct NoteMapThru<'a, S: MidiNoteSink> {
     scale: &'a Scale
 }
 
-
 impl <'a, S: MidiNoteSink>NoteMapThru<'a, S> {
     pub fn to(scale: &'a Scale, next: &'a S) -> NoteMapThru<'a, S> {
         NoteMapThru::<'a, S> {
@@ -178,7 +177,6 @@ impl <'a, S: MidiNoteSink>NoteMapThru<'a, S> {
     }
 }
 
-
 impl <'a, S: MidiNoteSink>MidiNoteSink for NoteMapThru<'a, S> {
     fn receive(&self, n: &Note, stats: &mut NoteStats) {
         let transposed = Note {
@@ -187,6 +185,32 @@ impl <'a, S: MidiNoteSink>MidiNoteSink for NoteMapThru<'a, S> {
         };
         
         self.next.receive(&transposed, stats);
+    }
+}
+
+
+// NoteSplitter
+
+struct NoteSplitter<'a, S1: MidiNoteSink, S2: MidiNoteSink> {
+    next1: &'a S1,
+    next2: &'a S2
+}
+
+
+impl <'a, S1: MidiNoteSink, S2: MidiNoteSink>NoteSplitter<'a, S1, S2> {
+    pub fn to(next1: &'a S1, next2: &'a S2) -> NoteSplitter<'a, S1, S2> {
+        NoteSplitter::<'a, S1, S2> {
+            next1,
+            next2
+        }
+    }
+}
+
+
+impl <'a, S1: MidiNoteSink, S2: MidiNoteSink>MidiNoteSink for NoteSplitter<'a, S1, S2> {
+    fn receive(&self, n: &Note, stats: &mut NoteStats) {
+        self.next1.receive(&n, stats);
+        self.next2.receive(&n, stats);
     }
 }
 
@@ -290,11 +314,17 @@ fn main() -> Result<(), RtMidiError> {
 
     input.open_port(korg_port, "RtMidi Input")?;
 
-    let stats = Mutex::new(NoteStats::new());
-    let hold = HoldingThru::using_device("USB");
     let scale = Scale::from(48, &LYDIAN);
-    let oct = RandomOctaveStage::to(4, -1, &hold);
-    let mapper = NoteMapThru::to(&scale, &oct);
+    let stats = Mutex::new(NoteStats::new());
+
+    let hold_korg = HoldingThru::using_device("USB");
+    let hold_d110 = HoldingThru::using_device("EDIROL");
+
+    let oct_korg = RandomOctaveStage::to(4, -1, &hold_korg);
+    let oct_d110 = RandomOctaveStage::to(2, -1, &hold_d110);
+
+    let splitter = NoteSplitter::to(&oct_korg, &oct_d110);
+    let mapper = NoteMapThru::to(&scale, &splitter);
     let sink = InputRegister::then(&mapper);
 
     let (midi_in_tx, midi_in_rx) = mpsc::channel();
