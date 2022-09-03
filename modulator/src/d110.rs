@@ -201,7 +201,7 @@ pub const PARTIAL_SPEC: [Updater; 58] = [
     Updater::Sweep("env_amplitude_decayTime", 4, 10),
     Updater::Sweep("env_amplitude_attack2Time", 1, 10),
     Updater::Sweep("env_amplitude_slopeTime", 5, 99),
-    Updater::Sweep("env_amplitude_releaseTime", 5, 99),  // less extreme, and needs to depend on overall note length requirement
+    Updater::Const("env_amplitude_releaseTime", 0), //, 5, 99),  // less extreme, and needs to depend on overall note length requirement
     Updater::Sweep("env_amplitude_attackLevel", 70, 99), // pair up 1+2, 3+4 and make the pairs change in complements. apexes are switchover points, the one at zero is reset.
     Updater::Sweep("env_amplitude_breakPoint", 43, 57),
     Updater::Sweep("env_amplitude_attack2Level", 10, 90),
