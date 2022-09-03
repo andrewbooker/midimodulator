@@ -79,7 +79,7 @@ impl SysExComposer for D110SysEx {
 
 pub fn init_d110() -> D110SysEx {
     const RES_ALLOWANCE_FOR_PARTIALS: [u8; 9] = [32, 0, 0, 0, 0, 0, 0, 0, 0];
-    const MIDI_CHANNELS: [u8; 9] = [1, 9, 9, 9, 9, 9, 9, 9, 1];
+    const MIDI_CHANNELS: [u8; 9] = [1, 9, 9, 9, 9, 9, 9, 9, 10];
 
     let mut sys_ex = D110SysEx::new();
 
@@ -104,8 +104,8 @@ pub fn init_timbre(number: u8) -> D110SysEx {
     sys_ex.data_u8(50); // fineTune +/- 50, 50 = 0
     sys_ex.data_u8(12); // benderRange semitones, 0-24
     sys_ex.data_u8(2); // note priority monoLast = 0, monoFirst, polyLast, polyFirst
-    sys_ex.data_u8(1); // outputAssign 1=mix?
-    sys_ex.data_u8(0); // reverb off
+    sys_ex.data_u8(7); // outputAssign 1=mix?
+    sys_ex.data_u8(0); // dummy/reverb off
     sys_ex.data_u8(if number == 1 { 98 } else { 0 });  // outputLevel max 100
     sys_ex.data_u8(7);  // pan 7 = mid, 0 = R, 15 = L
     sys_ex.data_u8(if number == 1 { 0 } else { 0x7F }); // keyRangeLower 0 = C-1
