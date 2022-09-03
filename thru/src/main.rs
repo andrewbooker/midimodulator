@@ -189,32 +189,6 @@ impl <'a, S: MidiNoteSink>MidiNoteSink for NoteMapThru<'a, S> {
 }
 
 
-// NoteSplitter
-
-struct NoteSplitter<'a, S1: MidiNoteSink, S2: MidiNoteSink> {
-    next1: &'a S1,
-    next2: &'a S2
-}
-
-
-impl <'a, S1: MidiNoteSink, S2: MidiNoteSink>NoteSplitter<'a, S1, S2> {
-    pub fn to(next1: &'a S1, next2: &'a S2) -> NoteSplitter<'a, S1, S2> {
-        NoteSplitter::<'a, S1, S2> {
-            next1,
-            next2
-        }
-    }
-}
-
-
-impl <'a, S1: MidiNoteSink, S2: MidiNoteSink>MidiNoteSink for NoteSplitter<'a, S1, S2> {
-    fn receive(&self, n: &Note, stats: &mut NoteStats) {
-        self.next1.receive(n, stats);
-        self.next2.receive(n, stats);
-    }
-}
-
-
 // RandomNoteDropper
 
 struct RandomNoteDropper<'a, S: MidiNoteSink> {
@@ -328,31 +302,35 @@ fn main() -> Result<(), RtMidiError> {
     for port in 0..input_ports {
         println!("Input {}: {}", port + 1, input.port_name(port)?);
     }
-    let korg_port = index_of("USB", &input);
-
-    input.open_port(korg_port, "RtMidi Input")?;
+    let input_port = index_of("USB", &input);
+    input.open_port(input_port, "RtMidi Input")?;
 
     let scale = Scale::from(48, &LYDIAN);
-    let stats = Mutex::new(NoteStats::new());
+
+    let stats_d110 = Mutex::new(NoteStats::new());
+    let stats_korg = Mutex::new(NoteStats::new());
 
     let hold_korg = HoldingThru::using_device("USB");
-    let hold_d110 = HoldingThru::using_device("EDIROL");
-
     let oct_korg = RandomOctaveStage::to(4, -1, &hold_korg);
+    let mapper_korg = NoteMapThru::to(&scale, &oct_korg);
+    let register_korg = InputRegister::then(&mapper_korg);
+
+    let hold_d110 = HoldingThru::using_device("EDIROL");
     let oct_d110 = RandomOctaveStage::to(2, -1, &hold_d110);
-    let dropper = RandomNoteDropper {
-        next: &oct_d110
-    };
-    let splitter = NoteSplitter::to(&oct_korg, &dropper);
-    let mapper = NoteMapThru::to(&scale, &splitter);
-    let sink = InputRegister::then(&mapper);
+    let mapper_d110 = NoteMapThru::to(&scale, &oct_d110);
+    let register_d110 = InputRegister::then(&mapper_d110);
+    let dropper = RandomNoteDropper { next: &register_d110 };
 
     let (midi_in_tx, midi_in_rx) = mpsc::channel();
     input.set_callback(|_timestamp, message| {
         if message[0] == 0x90 && message[2] != 0 {
             let n = Note::from_midi_message(&message);
-            let mut s = stats.lock().unwrap();
-            sink.receive(&n, &mut s);
+
+            let mut s_d110 = stats_d110.lock().unwrap();
+            let mut s_korg = stats_korg.lock().unwrap();
+            dropper.receive(&n, &mut s_d110);
+            register_korg.receive(&n, &mut s_korg);
+
             midi_in_tx.send(n.note).unwrap();
         }
     })?;
