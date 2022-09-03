@@ -209,8 +209,25 @@ impl <'a, S1: MidiNoteSink, S2: MidiNoteSink>NoteSplitter<'a, S1, S2> {
 
 impl <'a, S1: MidiNoteSink, S2: MidiNoteSink>MidiNoteSink for NoteSplitter<'a, S1, S2> {
     fn receive(&self, n: &Note, stats: &mut NoteStats) {
-        self.next1.receive(&n, stats);
-        self.next2.receive(&n, stats);
+        self.next1.receive(n, stats);
+        self.next2.receive(n, stats);
+    }
+}
+
+
+// RandomNoteDropper
+
+struct RandomNoteDropper<'a, S: MidiNoteSink> {
+    next: &'a S
+}
+
+impl <'a, S: MidiNoteSink>MidiNoteSink for RandomNoteDropper<'a, S> {
+    fn receive(&self, n: &Note, stats: &mut NoteStats) {
+        let r = rand::random::<f64>();
+        if r > 0.7 {
+            println!("sending {}", n.note);
+            self.next.receive(n, stats);
+        }
     }
 }
 
@@ -244,6 +261,7 @@ impl <'a, S: MidiNoteSink>MidiNoteSink for RandomOctaveStage<'a, S> {
         self.next.receive(&transposed, stats);
     }
 }
+
 
 // HoldingThru
 
@@ -322,8 +340,10 @@ fn main() -> Result<(), RtMidiError> {
 
     let oct_korg = RandomOctaveStage::to(4, -1, &hold_korg);
     let oct_d110 = RandomOctaveStage::to(2, -1, &hold_d110);
-
-    let splitter = NoteSplitter::to(&oct_korg, &oct_d110);
+    let dropper = RandomNoteDropper {
+        next: &oct_d110
+    };
+    let splitter = NoteSplitter::to(&oct_korg, &dropper);
     let mapper = NoteMapThru::to(&scale, &splitter);
     let sink = InputRegister::then(&mapper);
 
@@ -344,12 +364,11 @@ fn main() -> Result<(), RtMidiError> {
         loop {
             match midi_in_rx.try_recv() {
                 Ok(_) => {
-                    println!("{:?}", midi_in_rx);
-
+/*
                     let res = client.post("http://localhost:7878")
                                 .body("{}")
                                 .send().unwrap();
-                    println!("{:?}", res);
+                    println!("{:?}", res);*/
                 },
                 _ => {}
             }
