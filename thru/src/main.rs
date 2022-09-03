@@ -199,7 +199,6 @@ impl <'a, S: MidiNoteSink>MidiNoteSink for RandomNoteDropper<'a, S> {
     fn receive(&self, n: &Note, stats: &mut NoteStats) {
         let r = rand::random::<f64>();
         if r > 0.7 {
-            println!("sending {}", n.note);
             self.next.receive(n, stats);
         }
     }
@@ -311,7 +310,7 @@ fn main() -> Result<(), RtMidiError> {
     let stats_korg = Mutex::new(NoteStats::new());
 
     let hold_korg = HoldingThru::using_device("USB");
-    let oct_korg = RandomOctaveStage::to(4, -1, &hold_korg);
+    let oct_korg = RandomOctaveStage::to(4, 0, &hold_korg);
     let mapper_korg = NoteMapThru::to(&scale, &oct_korg);
     let register_korg = InputRegister::then(&mapper_korg);
 
