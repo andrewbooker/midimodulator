@@ -72,6 +72,24 @@ impl StepInterval for TimeBasedInterval {
     }
 }
 
+struct FixedEquivalentMillisInterval {
+    int: u32
+}
+
+impl FixedEquivalentMillisInterval {
+    fn new(int: u32) -> FixedEquivalentMillisInterval {
+        FixedEquivalentMillisInterval {
+            int
+        }
+    }
+}
+
+impl StepInterval for FixedEquivalentMillisInterval {
+    fn interval(&self) -> f32 {
+        self.int as f32
+    }
+}
+
 
 fn update_d110(updater: &mut PairedUpdater, d110_midi_out: &mut MidiOut) {
     let mut dummy_1 = DummySelector::new();
@@ -131,8 +149,7 @@ fn main() {
         let listener = TcpListener::bind("0.0.0.0:7878").unwrap();
         println!("tcp listener started on port 7878");
 
-        let interval = TimeBasedInterval::new();
-        let mut updater = PairedUpdater::new(&interval);
+        let mut count: u32 = 0;
         for stream in listener.incoming() {
             let mut stream = stream.unwrap();
             let buf_reader = BufReader::new(&mut stream);
@@ -143,6 +160,9 @@ fn main() {
                 .collect();
 
             println!("Request: {:#?}", http_request);
+            count += 1;
+            let interval = FixedEquivalentMillisInterval::new(1000 * count);
+            let mut updater = PairedUpdater::new(&interval);
 
             update_d110(&mut updater, &mut d110_midi_out);
             println!("part1 updated");
