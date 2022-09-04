@@ -2,6 +2,9 @@ use std::sync::mpsc;
 use std::sync::Mutex;
 use std::thread;
 use rtmidi::{RtMidiIn, RtMidiOut, RtMidiError};
+use json::object;
+use std::collections::HashMap;
+
 
 
 struct Note {
@@ -20,15 +23,25 @@ impl Note {
 
 struct NoteStats {
     received: u8,
-    sent: u8
+    sent: u8,
+    record_on_play: bool
 }
 
 
 impl NoteStats {
-    fn new() -> NoteStats {
+    fn basic() -> NoteStats {
         NoteStats {
             received: 0,
-            sent: 0
+            sent: 0,
+            record_on_play: false
+        }
+    }
+
+    fn recording() -> NoteStats {
+        NoteStats {
+            received: 0,
+            sent: 0,
+            record_on_play: true
         }
     }
 
@@ -57,8 +70,34 @@ impl NoteStats {
     fn put_sent(&mut self, n: &Note) {
         if self.sent != n.note {
             self.sent = n.note;
+            if self.record_on_play {
+                let data = object!{
+                    action: "on",
+                    note: n.note
+                };
+                let client = reqwest::blocking::Client::new();
+                let res = client.post("http://localhost:9009")
+                                .header("Content-type", "application/json")
+                                .body(data.dump())
+                                .send().unwrap();
+                println!("{:?}", res);
+            }
         } else {
             self.sent = 0;
+        }
+    }
+
+    fn put_cleared(&self) {
+        if self.record_on_play {
+            let data = object!{
+                action: "off"
+            };
+            let client = reqwest::blocking::Client::new();
+            let s = data.dump();
+            println!("{}", s);
+            client.post("http://localhost:9009")
+                                .body(s)
+                                .send().unwrap();
         }
     }
 
@@ -263,6 +302,7 @@ impl MidiNoteSink for HoldingThru {
         if !stats.last_sent().is_none() {
             let ls = stats.last_sent().unwrap();
             self.midi_out.message(&[0x80, ls, 0]).unwrap();
+            stats.put_cleared();
         }
 
         if stats.last_sent().is_none() || stats.last_sent().unwrap() != n.note {
@@ -306,8 +346,8 @@ fn main() -> Result<(), RtMidiError> {
 
     let scale = Scale::from(48, &LYDIAN);
 
-    let stats_d110 = Mutex::new(NoteStats::new());
-    let stats_korg = Mutex::new(NoteStats::new());
+    let stats_d110 = Mutex::new(NoteStats::basic());
+    let stats_korg = Mutex::new(NoteStats::recording());
 
     let hold_korg = HoldingThru::using_device("USB");
     let oct_korg = RandomOctaveStage::to(4, 0, &hold_korg);
@@ -337,11 +377,10 @@ fn main() -> Result<(), RtMidiError> {
     input.ignore_types(true, true, true)?;
 
     thread::spawn(move || {
-        let client = reqwest::blocking::Client::new();
         loop {
             match midi_in_rx.try_recv() {
                 Ok(_) => {
-/*
+/*                  let client = reqwest::blocking::Client::new();
                     let res = client.post("http://localhost:7878")
                                 .body("{}")
                                 .send().unwrap();
