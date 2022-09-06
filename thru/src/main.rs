@@ -7,6 +7,38 @@ use std::time::Duration;
 use reqwest::StatusCode;
 
 
+fn post_cmd_to_recorder(data: JsonValue) {
+    let client = reqwest::blocking::Client::new();
+    match client.post("http://localhost:9009")
+                    .header("Content-type", "application/json")
+                    .body(data.dump())
+                    .send() {
+        Err(e) => println!("{:?}", e),
+        Ok(res) => {
+            if res.status() != StatusCode::OK {
+                println!("{:?} {:?}", data, res.status());
+            }
+        }
+    }
+}
+
+
+fn post_cmd_to_modulator() {
+    let client = reqwest::blocking::Client::new();
+    match client.post("http://localhost:7878")
+                    .header("Content-type", "application/json")
+                    .body("{}")
+                    .send() {
+        Err(e) => println!("{:?}", e),
+        Ok(res) => {
+            if res.status() != StatusCode::OK {
+                println!("{:?}", res.status());
+            }
+        }
+    }
+}
+
+
 struct Note {
     note: u8,
     velocity: u8
@@ -28,20 +60,7 @@ struct NoteStats {
 }
 
 
-fn post_cmd_to_recorder(data: JsonValue) {
-    let client = reqwest::blocking::Client::new();
-    match client.post("http://localhost:9009")
-                    .header("Content-type", "application/json")
-                    .body(data.dump())
-                    .send() {
-        Err(e) => println!("{:?}", e),
-        Ok(res) => {
-            if res.status() != StatusCode::OK {
-                println!("{:?} {:?}", data, res.status());
-            }
-        }
-    }
-}
+
 
 
 impl NoteStats {
@@ -364,6 +383,7 @@ fn main() -> Result<(), RtMidiError> {
     let register_d110 = InputRegister::then(&mapper_d110);
     let dropper = RandomNoteDropper { next: &register_d110 };
 
+    let (midi_in_tx, midi_in_rx) = mpsc::channel();
     input.set_callback(|_timestamp, message| {
         if message[0] == 0x90 && message[2] != 0 {
             let n = Note::from_midi_message(&message);
@@ -372,12 +392,23 @@ fn main() -> Result<(), RtMidiError> {
             let mut s_korg = stats_korg.lock().unwrap();
             dropper.receive(&n, &mut s_d110);
             register_korg.receive(&n, &mut s_korg);
+            midi_in_tx.send(n.note).unwrap();
+
         }
     })?;
 
     input.ignore_types(true, true, true)?;
 
     println!("Starting...");
+
+    thread::spawn(move || {
+        loop {
+            match midi_in_rx.try_recv() {
+                Ok(_) => post_cmd_to_modulator(),
+                _ => thread::sleep(Duration::from_millis(100))
+            }
+        }
+    });
 
     let (cmd_stop_tx, cmd_stop_rx) = mpsc::channel();
     thread::spawn(move || {
