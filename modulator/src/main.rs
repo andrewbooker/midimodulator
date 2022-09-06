@@ -256,7 +256,7 @@ fn main() {
                 println!("stopping...");
                 break;
             },
-            _ => {}
+            _ => thread::sleep(Duration::from_millis(100))
         }
     }
     thread::sleep(Duration::from_millis(2000));

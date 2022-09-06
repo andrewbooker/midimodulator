@@ -400,7 +400,7 @@ fn main() -> Result<(), RtMidiError> {
                 println!("stopping...");
                 break;
             },
-            _ => {}
+            _ => thread::sleep(Duration::from_millis(100))
         }
     }
     
