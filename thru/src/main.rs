@@ -2,9 +2,9 @@ use std::sync::mpsc;
 use std::sync::Mutex;
 use std::thread;
 use rtmidi::{RtMidiIn, RtMidiOut, RtMidiError};
-use json::object;
-use std::collections::HashMap;
-
+use json::{object, JsonValue};
+use std::time::Duration;
+use reqwest::StatusCode;
 
 
 struct Note {
@@ -25,6 +25,22 @@ struct NoteStats {
     received: u8,
     sent: u8,
     record_on_play: bool
+}
+
+
+fn post_cmd_to_recorder(data: JsonValue) {
+    let client = reqwest::blocking::Client::new();
+    match client.post("http://localhost:9009")
+                    .header("Content-type", "application/json")
+                    .body(data.dump())
+                    .send() {
+        Err(e) => println!("{:?}", e),
+        Ok(res) => {
+            if res.status() != StatusCode::OK {
+                println!("{:?} {:?}", data, res.status());
+            }
+        }
+    }
 }
 
 
@@ -71,16 +87,10 @@ impl NoteStats {
         if self.sent != n.note {
             self.sent = n.note;
             if self.record_on_play {
-                let data = object!{
+                post_cmd_to_recorder(object!{
                     action: "on",
                     note: n.note
-                };
-                let client = reqwest::blocking::Client::new();
-                let res = client.post("http://localhost:9009")
-                                .header("Content-type", "application/json")
-                                .body(data.dump())
-                                .send().unwrap();
-                println!("{:?}", res);
+                });
             }
         } else {
             self.sent = 0;
@@ -89,15 +99,9 @@ impl NoteStats {
 
     fn put_cleared(&self) {
         if self.record_on_play {
-            let data = object!{
+            post_cmd_to_recorder(object!{
                 action: "off"
-            };
-            let client = reqwest::blocking::Client::new();
-            let s = data.dump();
-            println!("{}", s);
-            client.post("http://localhost:9009")
-                                .body(s)
-                                .send().unwrap();
+            });
         }
     }
 
@@ -360,7 +364,6 @@ fn main() -> Result<(), RtMidiError> {
     let register_d110 = InputRegister::then(&mapper_d110);
     let dropper = RandomNoteDropper { next: &register_d110 };
 
-    let (midi_in_tx, midi_in_rx) = mpsc::channel();
     input.set_callback(|_timestamp, message| {
         if message[0] == 0x90 && message[2] != 0 {
             let n = Note::from_midi_message(&message);
@@ -369,27 +372,10 @@ fn main() -> Result<(), RtMidiError> {
             let mut s_korg = stats_korg.lock().unwrap();
             dropper.receive(&n, &mut s_d110);
             register_korg.receive(&n, &mut s_korg);
-
-            midi_in_tx.send(n.note).unwrap();
         }
     })?;
 
     input.ignore_types(true, true, true)?;
-
-    thread::spawn(move || {
-        loop {
-            match midi_in_rx.try_recv() {
-                Ok(_) => {
-/*                  let client = reqwest::blocking::Client::new();
-                    let res = client.post("http://localhost:7878")
-                                .body("{}")
-                                .send().unwrap();
-                    println!("{:?}", res);*/
-                },
-                _ => {}
-            }
-        }
-    });
 
     println!("Starting...");
 
