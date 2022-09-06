@@ -5,11 +5,13 @@ use rtmidi::{RtMidiIn, RtMidiOut, RtMidiError};
 use json::{object, JsonValue};
 use std::time::Duration;
 use reqwest::StatusCode;
+use std::error::Error;
 
 
-fn post_cmd_to_recorder(data: JsonValue) {
+
+fn post_cmd(port: u16, data: JsonValue) {
     let client = reqwest::blocking::Client::new();
-    match client.post("http://localhost:9009")
+    match client.post(format!("http://localhost:{}", port))
                     .header("Content-type", "application/json")
                     .body(data.dump())
                     .send() {
@@ -23,19 +25,12 @@ fn post_cmd_to_recorder(data: JsonValue) {
 }
 
 
+fn post_cmd_to_recorder(data: JsonValue) {
+    post_cmd(9009, data);
+}
+
 fn post_cmd_to_modulator() {
-    let client = reqwest::blocking::Client::new();
-    match client.post("http://localhost:7878")
-                    .header("Content-type", "application/json")
-                    .body("{}")
-                    .send() {
-        Err(e) => println!("{:?}", e),
-        Ok(res) => {
-            if res.status() != StatusCode::OK {
-                println!("{:?}", res.status());
-            }
-        }
-    }
+    post_cmd(7878, object!{});
 }
 
 
