@@ -101,11 +101,58 @@ fn update_d110(updater: &mut PairedUpdater, d110_midi_out: &mut MidiOut) {
     updater.update(&mut p1, &mut dummy_1, &mut dummy_2, &PARTIAL_SPEC, Some("partialC_2"));
     updater.update(&mut p1, &mut dummy_1, &mut dummy_2, &PARTIAL_SPEC, Some("partialD_4"));
     updater.sweep_alternator();
-    for (key, val) in &updater.sweep_state {
-        println!("{}: {}", key, val.val);
-    }
+    //for (key, val) in &updater.sweep_state {
+    //    println!("{}: {}", key, val.val);
+    //}
     d110_midi_out.send_sys_ex(&p1.to_send());
 }
+
+
+fn modulate_d110(edirol: i32) {
+    let mut d110_midi_out = MidiOut::using_device(edirol);
+    let d110_init = init_d110();
+    d110_midi_out.send_sys_ex(&d110_init.to_send());
+    for t in 1..9 {
+        println!("sending timbre {}", t);
+        d110_midi_out.send_sys_ex(&init_timbre(t).to_send());
+    }
+    for t in 2..9 {
+        println!("muting part {}", t);
+        d110_midi_out.send_sys_ex(&set_up_part(t).to_send());
+    }
+    println!("D110 init sent");
+
+    let listener = TcpListener::bind("0.0.0.0:7878").unwrap();
+    println!("tcp listener started on port 7878");
+
+    let mut count: u32 = 0;
+    for stream in listener.incoming() {
+        let mut stream = stream.unwrap();
+        let buf_reader = BufReader::new(&mut stream);
+        let http_request: Vec<_> = buf_reader
+            .lines()
+            .map(|result| result.unwrap())
+            .take_while(|line| !line.is_empty())
+            .collect();
+
+        println!("Request: {:#?}", http_request);
+        count += 1;
+        let interval = FixedEquivalentMillisInterval::new(1000 * count);
+        let mut updater = PairedUpdater::new(&interval);
+
+        update_d110(&mut updater, &mut d110_midi_out);
+        println!("part1 updated");
+
+        let status_line = "HTTP/1.1 200 OK";
+        let contents = json::stringify(vec![0]);
+        let length = contents.len();
+
+        let response = format!("{status_line}\r\nContent-Type: application/json; charset=UTF-8\r\nContent-Length: {length}\r\n\r\n{contents}");
+
+        stream.write_all(response.as_bytes()).unwrap();
+    }
+}
+
 
 fn main() {
     let edirol = MidiOutDevices::index_of("edirol").unwrap();
@@ -132,50 +179,7 @@ fn main() {
         midi_out.send_sys_ex(&kssx.data);
     }
 
-    thread::spawn(move || {
-        let mut d110_midi_out = MidiOut::using_device(edirol);
-        let d110_init = init_d110();
-        d110_midi_out.send_sys_ex(&d110_init.to_send());
-        for t in 1..9 {
-            println!("sending timbre {}", t);
-            d110_midi_out.send_sys_ex(&init_timbre(t).to_send());
-        }
-        for t in 2..9 {
-            println!("muting part {}", t);
-            d110_midi_out.send_sys_ex(&set_up_part(t).to_send());
-        }
-        println!("D110 init sent");
-
-        let listener = TcpListener::bind("0.0.0.0:7878").unwrap();
-        println!("tcp listener started on port 7878");
-
-        let mut count: u32 = 0;
-        for stream in listener.incoming() {
-            let mut stream = stream.unwrap();
-            let buf_reader = BufReader::new(&mut stream);
-            let http_request: Vec<_> = buf_reader
-                .lines()
-                .map(|result| result.unwrap())
-                .take_while(|line| !line.is_empty())
-                .collect();
-
-            println!("Request: {:#?}", http_request);
-            count += 1;
-            let interval = FixedEquivalentMillisInterval::new(1000 * count);
-            let mut updater = PairedUpdater::new(&interval);
-
-            update_d110(&mut updater, &mut d110_midi_out);
-            println!("part1 updated");
-
-            let status_line = "HTTP/1.1 200 OK";
-            let contents = json::stringify(vec![0]);
-            let length = contents.len();
-
-            let response = format!("{status_line}\r\nContent-Type: application/json; charset=UTF-8\r\nContent-Length: {length}\r\n\r\n{contents}");
-
-            stream.write_all(response.as_bytes()).unwrap();
-        }
-    });
+    thread::spawn(move || { modulate_d110(edirol); });
 
     let ports = serialport::available_ports().expect("No ports found!");
     for p in ports {
