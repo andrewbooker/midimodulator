@@ -5,8 +5,6 @@ use rtmidi::{RtMidiIn, RtMidiOut, RtMidiError};
 use json::{object, JsonValue};
 use std::time::Duration;
 use reqwest::StatusCode;
-use std::error::Error;
-
 
 
 fn post_cmd(port: u16, data: JsonValue) {
@@ -313,6 +311,10 @@ impl HoldingThru {
         }
         t
     }
+
+    pub fn send_all_note_off(&self) {
+        self.midi_out.message(&[0xB0, 0x7B, 0]).unwrap();
+    }
 }
 
 impl MidiNoteSink for HoldingThru {
@@ -334,7 +336,7 @@ impl MidiNoteSink for HoldingThru {
 
 impl Drop for HoldingThru {
     fn drop(&mut self) {
-        self.midi_out.message(&[0xB0, 0x7B, 0]).unwrap();
+        self.send_all_note_off();
         println!("HoldingThru closed");
     }
 }
@@ -406,6 +408,7 @@ fn main() -> Result<(), RtMidiError> {
     });
 
     let (cmd_stop_tx, cmd_stop_rx) = mpsc::channel();
+    let (cmd_note_off_tx, cmd_note_off_rx) = mpsc::channel();
     thread::spawn(move || {
         let g = getch::Getch::new();
         loop {
@@ -415,6 +418,9 @@ fn main() -> Result<(), RtMidiError> {
                     cmd_stop_tx.send(()).unwrap();
                     break;
                 },
+                'o' => {
+                    cmd_note_off_tx.send(()).unwrap();
+                }
                 _ => {}
             }
         }
@@ -426,8 +432,19 @@ fn main() -> Result<(), RtMidiError> {
                 println!("stopping...");
                 break;
             },
-            _ => thread::sleep(Duration::from_millis(100))
+            _ => thread::sleep(Duration::from_millis(50))
         }
+        match cmd_note_off_rx.try_recv() {
+            Ok(_) => {
+                post_cmd_to_recorder(object!{
+                    action: "off"
+                });
+                hold_korg.send_all_note_off();
+                hold_d110.send_all_note_off();
+            },
+            _ => thread::sleep(Duration::from_millis(50))
+        }
+
     }
     
     Ok(())
