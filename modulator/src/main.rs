@@ -155,7 +155,7 @@ fn modulate_d110(edirol: i32) {
 }
 
 
-fn modulate_korg<R>(cmd_dump_rx: &Receiver<R>, res_tx: &Sender<HashMap<std::string::String, SweepState>>) {
+fn modulate_korg<C>(cmd_dump_rx: &Receiver<C>, res_tx: &Sender<HashMap<std::string::String, SweepState>>, first_tx: &Sender<i32>) {
     let mut port = serialport::new("/dev/ttyUSB0", 38400)
                     .timeout(Duration::from_millis(1000))
                     .open()
@@ -167,6 +167,7 @@ fn modulate_korg<R>(cmd_dump_rx: &Receiver<R>, res_tx: &Sender<HashMap<std::stri
     let mut osc_selector = KorgOscSelector::new();
 
     let today = utils::today();
+    let mut first = true;
 
     loop {
         let mut kpsx = KorgProgramSysEx::new();
@@ -193,6 +194,11 @@ fn modulate_korg<R>(cmd_dump_rx: &Receiver<R>, res_tx: &Sender<HashMap<std::stri
             },
             _ => {}
         }
+        if first {
+            first_tx.send(0).unwrap();
+            first = false;
+            thread::sleep(Duration::from_millis(100));
+        }
     }
 }
 
@@ -203,26 +209,15 @@ fn main() {
     println!("EDIROL (D110) port {}", edirol);
     println!("USB (korg) port {}", usb);
 
-    let mut midi_out = MidiOut::using_device(usb);
-    {
-        let kssx = KorgInitSysEx::new(0x02); // select prog
-        midi_out.send_sys_ex(&kssx.data);
-    }
+    thread::spawn(move || { modulate_d110(edirol); });
 
-    midi_out.send(&MidiMessage::program(33, korg::CHANNEL));
+    let mut midi_out = MidiOut::using_device(usb);
+    midi_out.send_sys_ex(&KorgInitSysEx::new(0x02).data); // select prog
+    midi_out.send(&MidiMessage::program(33, korg::CHANNEL)); // select 33
     thread::sleep(Duration::from_millis(100));
 
-    {
-        let kssx = KorgInitSysEx::new(0x03); // edit prog
-        midi_out.send_sys_ex(&kssx.data);
-    }
-
-    {
-        let kssx = KorgSingleParamSysEx::new(0, 1); // oscillator mode: Double, on UI, otherwise the screen value overrides th sysEx
-        midi_out.send_sys_ex(&kssx.data);
-    }
-
-    thread::spawn(move || { modulate_d110(edirol); });
+    midi_out.send_sys_ex(&KorgInitSysEx::new(0x03).data); // edit prog
+    midi_out.send_sys_ex(&KorgSingleParamSysEx::new(0, 1).data); // oscillator mode: Double, on UI, otherwise the screen value overrides th sysEx
 
     let ports = serialport::available_ports().expect("No ports found!");
     for p in ports {
@@ -232,8 +227,9 @@ fn main() {
     let (cmd_dump_tx, cmd_dump_rx) = mpsc::channel();
     let (cmd_stop_tx, cmd_stop_rx) = mpsc::channel();
     let (res_tx, res_rx) = mpsc::channel();
+    let (first_tx, first_korg_rx) = mpsc::channel();
 
-    thread::spawn(move || { modulate_korg(&cmd_dump_rx, &res_tx); });
+    thread::spawn(move || { modulate_korg(&cmd_dump_rx, &res_tx, &first_tx); });
 
     thread::spawn(move || {
         let g = getch::Getch::new();
@@ -264,7 +260,14 @@ fn main() {
                 println!("stopping...");
                 break;
             },
-            _ => thread::sleep(Duration::from_millis(100))
+            _ => thread::sleep(Duration::from_millis(50))
+        }
+        match first_korg_rx.try_recv() {
+            Ok(0) => {
+                midi_out.send_sys_ex(&KorgInitSysEx::new(0x02).data); // select prog (deselect edit, otherwise the oscillators don't change
+                println!("first korg modulation sent");
+            },
+            _ => thread::sleep(Duration::from_millis(50))
         }
     }
     thread::sleep(Duration::from_millis(2000));
