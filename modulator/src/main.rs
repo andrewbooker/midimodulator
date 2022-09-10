@@ -9,7 +9,9 @@ mod modulation;
 use crate::modulation::{
     SysExComposer,
     PairedUpdater,
-    StepInterval
+    StepInterval,
+    SweepState,
+    Selector
 };
 use crate::d110::{
     init_d110,
@@ -30,13 +32,12 @@ use crate::midi::{MidiMessage, MidiOut, MidiOutDevices};
 use std::{
     thread,
     time::{Duration, Instant},
-    sync::mpsc,
+    sync::{mpsc, mpsc::{Sender, Receiver}},
     io::{prelude::*, BufReader},
-    net::{TcpListener}
+    net::TcpListener,
+    collections::HashMap
 };
 
-
-use crate::modulation::Selector;
 
 struct DummySelector;
 
@@ -154,6 +155,48 @@ fn modulate_d110(edirol: i32) {
 }
 
 
+fn modulate_korg<R>(cmd_dump_rx: &Receiver<R>, res_tx: &Sender<HashMap<std::string::String, SweepState>>) {
+    let mut port = serialport::new("/dev/ttyUSB0", 38400)
+                    .timeout(Duration::from_millis(1000))
+                    .open()
+                    .expect("Failed to open port");
+
+    let interval = TimeBasedInterval::new();
+    let mut updater = PairedUpdater::new(&interval);
+    let mut effect_selector = KorgEffectSelector::new();
+    let mut osc_selector = KorgOscSelector::new();
+
+    let today = utils::today();
+
+    loop {
+        let mut kpsx = KorgProgramSysEx::new();
+        kpsx.name(&today);
+
+        let eff1_updater = &effect_selector.eff1.updater;
+        let eff2_updater = &effect_selector.eff2.updater;
+        let pre_eff = &effect_selector.pre_eff();
+
+        updater.update(&mut kpsx, &mut osc_selector, &mut effect_selector, &PROGRAM_SPEC, None);
+        updater.update(&mut kpsx, &mut osc_selector, &mut effect_selector, &OSC_SPEC, Some("osc1"));
+        updater.update(&mut kpsx, &mut osc_selector, &mut effect_selector, &OSC_SPEC, Some("osc2"));
+        updater.update(&mut kpsx, &mut osc_selector, &mut effect_selector, pre_eff, None);
+        updater.update(&mut kpsx, &mut osc_selector, &mut effect_selector, eff1_updater, Some("eff1"));
+        updater.update(&mut kpsx, &mut osc_selector, &mut effect_selector, eff2_updater, Some("eff2"));
+        updater.sweep_alternator();
+
+        port.write(&kpsx.data).expect("Write failed!");
+        thread::sleep(Duration::from_millis(100));
+
+        match cmd_dump_rx.try_recv() {
+            Ok(_) => {
+                res_tx.send(updater.sweep_state.clone()).unwrap();
+            },
+            _ => {}
+        }
+    }
+}
+
+
 fn main() {
     let edirol = MidiOutDevices::index_of("edirol").unwrap();
     let usb = MidiOutDevices::index_of("usb").unwrap();
@@ -190,46 +233,7 @@ fn main() {
     let (cmd_stop_tx, cmd_stop_rx) = mpsc::channel();
     let (res_tx, res_rx) = mpsc::channel();
 
-    thread::spawn(move || {
-        let mut port = serialport::new("/dev/ttyUSB0", 38400)
-                    .timeout(Duration::from_millis(1000))
-                    .open()
-                    .expect("Failed to open port");
-
-        let interval = TimeBasedInterval::new();
-        let mut updater = PairedUpdater::new(&interval);
-        let mut effect_selector = KorgEffectSelector::new();
-        let mut osc_selector = KorgOscSelector::new();
-
-        let today = utils::today();
-
-        loop {
-            let mut kpsx = KorgProgramSysEx::new();
-            kpsx.name(&today);
-            
-            let eff1_updater = &effect_selector.eff1.updater;
-            let eff2_updater = &effect_selector.eff2.updater;
-            let pre_eff = &effect_selector.pre_eff();
-
-            updater.update(&mut kpsx, &mut osc_selector, &mut effect_selector, &PROGRAM_SPEC, None);
-            updater.update(&mut kpsx, &mut osc_selector, &mut effect_selector, &OSC_SPEC, Some("osc1"));
-            updater.update(&mut kpsx, &mut osc_selector, &mut effect_selector, &OSC_SPEC, Some("osc2"));
-            updater.update(&mut kpsx, &mut osc_selector, &mut effect_selector, pre_eff, None);
-            updater.update(&mut kpsx, &mut osc_selector, &mut effect_selector, eff1_updater, Some("eff1"));
-            updater.update(&mut kpsx, &mut osc_selector, &mut effect_selector, eff2_updater, Some("eff2"));
-            updater.sweep_alternator();
-
-            port.write(&kpsx.data).expect("Write failed!");
-            thread::sleep(Duration::from_millis(100));
-
-            match cmd_dump_rx.try_recv() {
-                Ok(_) => {
-                    res_tx.send(updater.sweep_state.clone()).unwrap();
-                },
-                _ => {}
-            }
-        }
-    });
+    thread::spawn(move || { modulate_korg(&cmd_dump_rx, &res_tx); });
 
     thread::spawn(move || {
         let g = getch::Getch::new();
