@@ -4,6 +4,7 @@ use std::thread;
 use rtmidi::{RtMidiIn, RtMidiOut, RtMidiError};
 use json::{object, JsonValue};
 use std::time::Duration;
+use std::collections::HashMap;
 use reqwest::StatusCode;
 
 
@@ -177,9 +178,6 @@ impl MidiNoteSink for SimpleThru {
 // Scale
 
 type Mode = [u8; 6];
-const AEOLIAN: Mode = [2, 1, 2, 2, 1, 2];
-const LYDIAN: Mode = [2, 2, 2, 1, 2, 2];
-
 const SCALE_LENGTH: usize = 9;
 
 struct Scale {
@@ -364,10 +362,14 @@ fn index_of(substr: &str, input: &RtMidiIn) -> u32 {
 
 const KORG_OUT: &str = "USB";
 const D110_OUT: &str = "EDIROL";
-
-
+const NUM_PARTS: usize = 2;
 
 fn main() -> Result<(), RtMidiError> {
+
+    let modes: HashMap<&str, Mode> = HashMap::from([
+        ("aolian", [2, 1, 2, 2, 1, 2]),
+        ("lydian", [2, 2, 2, 1, 2, 2])
+    ]);
 
     let input = RtMidiIn::new(Default::default())?;
     let input_ports = input.port_count()?;
@@ -378,10 +380,12 @@ fn main() -> Result<(), RtMidiError> {
     let input_port = index_of("USB", &input);
     input.open_port(input_port, "RtMidi Input")?;
 
-    let stats_one = Mutex::new(NoteStats::recording());
-    let stats_two = Mutex::new(NoteStats::basic());
+    let stats: [Mutex<NoteStats>; NUM_PARTS] = [
+        Mutex::new(NoteStats::basic()),
+        Mutex::new(NoteStats::recording())
+    ];
 
-    let scale = Scale::from(48, &LYDIAN);
+    let scale = Scale::from(48, &modes["lydian"]);
 
     let korg_midi_out = find_output_from(KORG_OUT);
     let hold_korg = HoldingThru::using_device(&korg_midi_out);
@@ -396,17 +400,18 @@ fn main() -> Result<(), RtMidiError> {
     let register_d110 = InputRegister::then(&mapper_d110);
     let dropper = RandomNoteDropper { next: &register_d110 };
 
-    let channels = (dropper, register_korg);
+    let parts: [&dyn MidiNoteSink; NUM_PARTS] = [&dropper, &register_korg];
 
     let (midi_in_tx, midi_in_rx) = mpsc::channel();
     input.set_callback(|_timestamp, message| {
         if message[0] == 0x90 && message[2] != 0 {
             let n = Note::from_midi_message(&message);
 
-            let mut s_2 = stats_two.lock().unwrap();
-            let mut s_1 = stats_one.lock().unwrap();
-            channels.0.receive(&n, &mut s_2);
-            channels.1.receive(&n, &mut s_1);
+            for i in 0..NUM_PARTS {
+                let mut st = stats[i].lock().unwrap();
+                parts[i].receive(&n, &mut st);
+            }
+
             midi_in_tx.send(n.note).unwrap();
         }
     })?;
