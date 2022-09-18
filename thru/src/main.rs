@@ -150,11 +150,6 @@ impl <'a, S: MidiNoteSink>MidiNoteSink for InputRegister<'a, S> {
 }
 
 
-trait OutputStage {
-    fn send_all_note_off(&self);
-}
-
-
 // SimpleThru
 
 struct SimpleThru {
@@ -296,35 +291,41 @@ impl <'a, S: MidiNoteSink>MidiNoteSink for RandomOctaveStage<'a, S> {
 }
 
 
+fn find_output_from(substr: &str) -> RtMidiOut {
+    let m = RtMidiOut::new(Default::default()).unwrap();
+
+    for port in 0..m.port_count().unwrap() {
+        let name = m.port_name(port).unwrap();
+        if name.to_lowercase().contains(&substr.to_lowercase()) {
+            println!("found output port {} for {} ({})", port, substr, name);
+            m.open_port(port, "HoldingThru out").unwrap();
+        }
+    }
+    m
+}
+
+
 // HoldingThru
 
-struct HoldingThru {
-    midi_out: RtMidiOut
+struct HoldingThru<'a> {
+    midi_out: &'a RtMidiOut
 }
 
-impl HoldingThru {
-    pub fn using_device(substr: &str) -> HoldingThru {
-        let t = HoldingThru {
-            midi_out: RtMidiOut::new(Default::default()).unwrap()
-        };
-        for port in 0..t.midi_out.port_count().unwrap() {
-            let name = t.midi_out.port_name(port).unwrap();
-            if name.to_lowercase().contains(&substr.to_lowercase()) {
-                println!("found output port {} for {} ({})", port, substr, name);
-                t.midi_out.open_port(port, "HoldingThru out").unwrap();
-            }
+impl <'a>HoldingThru<'a> {
+    pub fn using_device(midi_out: &'a RtMidiOut) -> HoldingThru {
+        HoldingThru {
+            midi_out
         }
-        t
     }
 }
 
-impl OutputStage for HoldingThru {
-    fn send_all_note_off(&self) {
-        self.midi_out.message(&[0xB0, 0x7B, 0]).unwrap();
-    }
+
+fn send_all_note_off(midi_out: &RtMidiOut) {
+    midi_out.message(&[0xB0, 0x7B, 0]).unwrap();
 }
 
-impl MidiNoteSink for HoldingThru {
+
+impl <'a>MidiNoteSink for HoldingThru<'a> {
     fn receive(&self, n: &Note, stats: &mut NoteStats) {
         if !stats.last_sent().is_none() {
             let ls = stats.last_sent().unwrap();
@@ -341,9 +342,9 @@ impl MidiNoteSink for HoldingThru {
     }
 }
 
-impl Drop for HoldingThru {
+impl <'a>Drop for HoldingThru<'a> {
     fn drop(&mut self) {
-        self.send_all_note_off();
+        send_all_note_off(&self.midi_out);
         println!("HoldingThru closed");
     }
 }
@@ -382,12 +383,14 @@ fn main() -> Result<(), RtMidiError> {
 
     let scale = Scale::from(48, &LYDIAN);
 
-    let hold_korg = HoldingThru::using_device(KORG_OUT);
+    let korg_midi_out = find_output_from(KORG_OUT);
+    let hold_korg = HoldingThru::using_device(&korg_midi_out);
     let oct_korg = RandomOctaveStage::to(4, 0, &hold_korg);
     let mapper_korg = NoteMapThru::to(&scale, &oct_korg);
     let register_korg = InputRegister::then(&mapper_korg);
 
-    let hold_d110 = HoldingThru::using_device(D110_OUT);
+    let d110_midi_out = find_output_from(D110_OUT);
+    let hold_d110 = HoldingThru::using_device(&d110_midi_out);
     let oct_d110 = RandomOctaveStage::to(2, -1, &hold_d110);
     let mapper_d110 = NoteMapThru::to(&scale, &oct_d110);
     let register_d110 = InputRegister::then(&mapper_d110);
@@ -453,8 +456,8 @@ fn main() -> Result<(), RtMidiError> {
                 post_cmd_to_recorder(object!{
                     action: "off"
                 });
-                hold_korg.send_all_note_off();
-                hold_d110.send_all_note_off();
+                send_all_note_off(&korg_midi_out);
+                send_all_note_off(&d110_midi_out);
             },
             _ => thread::sleep(Duration::from_millis(50))
         }
