@@ -150,6 +150,11 @@ impl <'a, S: MidiNoteSink>MidiNoteSink for InputRegister<'a, S> {
 }
 
 
+trait OutputStage {
+    fn send_all_note_off(&self);
+}
+
+
 // SimpleThru
 
 struct SimpleThru {
@@ -311,8 +316,10 @@ impl HoldingThru {
         }
         t
     }
+}
 
-    pub fn send_all_note_off(&self) {
+impl OutputStage for HoldingThru {
+    fn send_all_note_off(&self) {
         self.midi_out.message(&[0xB0, 0x7B, 0]).unwrap();
     }
 }
@@ -353,6 +360,12 @@ fn index_of(substr: &str, input: &RtMidiIn) -> u32 {
     0
 }
 
+
+const KORG_OUT: &str = "USB";
+const D110_OUT: &str = "EDIROL";
+
+
+
 fn main() -> Result<(), RtMidiError> {
 
     let input = RtMidiIn::new(Default::default())?;
@@ -364,33 +377,34 @@ fn main() -> Result<(), RtMidiError> {
     let input_port = index_of("USB", &input);
     input.open_port(input_port, "RtMidi Input")?;
 
+    let stats_one = Mutex::new(NoteStats::recording());
+    let stats_two = Mutex::new(NoteStats::basic());
+
     let scale = Scale::from(48, &LYDIAN);
 
-    let stats_d110 = Mutex::new(NoteStats::basic());
-    let stats_korg = Mutex::new(NoteStats::recording());
-
-    let hold_korg = HoldingThru::using_device("USB");
+    let hold_korg = HoldingThru::using_device(KORG_OUT);
     let oct_korg = RandomOctaveStage::to(4, 0, &hold_korg);
     let mapper_korg = NoteMapThru::to(&scale, &oct_korg);
     let register_korg = InputRegister::then(&mapper_korg);
 
-    let hold_d110 = HoldingThru::using_device("EDIROL");
+    let hold_d110 = HoldingThru::using_device(D110_OUT);
     let oct_d110 = RandomOctaveStage::to(2, -1, &hold_d110);
     let mapper_d110 = NoteMapThru::to(&scale, &oct_d110);
     let register_d110 = InputRegister::then(&mapper_d110);
     let dropper = RandomNoteDropper { next: &register_d110 };
+
+    let channels = (dropper, register_korg);
 
     let (midi_in_tx, midi_in_rx) = mpsc::channel();
     input.set_callback(|_timestamp, message| {
         if message[0] == 0x90 && message[2] != 0 {
             let n = Note::from_midi_message(&message);
 
-            let mut s_d110 = stats_d110.lock().unwrap();
-            let mut s_korg = stats_korg.lock().unwrap();
-            dropper.receive(&n, &mut s_d110);
-            register_korg.receive(&n, &mut s_korg);
+            let mut s_2 = stats_two.lock().unwrap();
+            let mut s_1 = stats_one.lock().unwrap();
+            channels.0.receive(&n, &mut s_2);
+            channels.1.receive(&n, &mut s_1);
             midi_in_tx.send(n.note).unwrap();
-
         }
     })?;
 
