@@ -6,6 +6,7 @@ use json::{object, JsonValue};
 use std::time::Duration;
 use std::collections::HashMap;
 use reqwest::StatusCode;
+use std::rc::Rc;
 
 
 fn post_cmd(port: u16, data: JsonValue) {
@@ -306,11 +307,11 @@ fn find_output_from(substr: &str) -> RtMidiOut {
 // HoldingThru
 
 struct HoldingThru<'a> {
-    midi_out: &'a RtMidiOut
+    midi_out: Rc<&'a RtMidiOut>
 }
 
 impl <'a>HoldingThru<'a> {
-    pub fn using_device(midi_out: &'a RtMidiOut) -> HoldingThru {
+    pub fn using_device(midi_out: Rc<&RtMidiOut>) -> HoldingThru {
         HoldingThru {
             midi_out
         }
@@ -389,13 +390,13 @@ fn main() -> Result<(), RtMidiError> {
     let scale = Scale::from(48, &modes["lydian"]);
 
     let korg_midi_out = find_output_from(KORG_OUT);
-    let hold_korg = HoldingThru::using_device(&korg_midi_out);
+    let hold_korg = HoldingThru::using_device(Rc::new(&korg_midi_out));
     let oct_korg = RandomOctaveStage::to(4, 0, &hold_korg);
     let mapper_korg = NoteMapThru::to(&scale, &oct_korg);
     let register_korg = InputRegister::then(&mapper_korg);
 
     let d110_midi_out = find_output_from(D110_OUT);
-    let hold_d110 = HoldingThru::using_device(&d110_midi_out);
+    let hold_d110 = HoldingThru::using_device(Rc::new(&d110_midi_out));
     let oct_d110 = RandomOctaveStage::to(2, -1, &hold_d110);
     let mapper_d110 = NoteMapThru::to(&scale, &oct_d110);
     let register_d110 = InputRegister::then(&mapper_d110);
