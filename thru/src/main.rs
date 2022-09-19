@@ -264,11 +264,11 @@ impl <'a, S: MidiNoteSink>MidiNoteSink for RandomNoteDropper<'a, S> {
 struct RandomOctaveStage<'a, S: MidiNoteSink> {
     octave_range: u8,
     base: i8,
-    next: &'a S
+    next: &'a Rc<S>
 }
 
 impl <'a, S: MidiNoteSink>RandomOctaveStage<'a, S> {
-    pub fn to(octave_range: u8, base: i8, next: &'a S) -> RandomOctaveStage<'a, S> {
+    pub fn to(octave_range: u8, base: i8, next: &'a Rc<S>) -> RandomOctaveStage<'a, S> {
         RandomOctaveStage::<'a, S> {
             octave_range,
             base,
@@ -311,9 +311,9 @@ struct HoldingThru<'a> {
 }
 
 impl <'a>HoldingThru<'a> {
-    pub fn using_device(midi_out: Rc<&RtMidiOut>) -> HoldingThru {
+    pub fn using_device(m: &'a RtMidiOut) -> HoldingThru {
         HoldingThru {
-            midi_out
+            midi_out: Rc::new(m)
         }
     }
 }
@@ -366,6 +366,7 @@ const D110_OUT: &str = "4i4o MIDI 4";
 const MIDI_IN: &str = "4i4o MIDI 4";
 const NUM_PARTS: usize = 2;
 
+
 fn main() -> Result<(), RtMidiError> {
 
     let modes: HashMap<&str, Mode> = HashMap::from([
@@ -388,16 +389,18 @@ fn main() -> Result<(), RtMidiError> {
     ];
 
     let scale = Scale::from(48, &modes["lydian"]);
-
     let korg_midi_out = find_output_from(KORG_OUT);
-    let hold_korg = HoldingThru::using_device(Rc::new(&korg_midi_out));
-    let oct_korg = RandomOctaveStage::to(4, 0, &hold_korg);
+    let d110_midi_out = find_output_from(D110_OUT);
+
+    let seq1 = vec!(Rc::new(HoldingThru::using_device(&korg_midi_out)));
+
+    let oct_korg = RandomOctaveStage::to(4, 0, &seq1[0]);
     let mapper_korg = NoteMapThru::to(&scale, &oct_korg);
     let register_korg = InputRegister::then(&mapper_korg);
 
-    let d110_midi_out = find_output_from(D110_OUT);
-    let hold_d110 = HoldingThru::using_device(Rc::new(&d110_midi_out));
-    let oct_d110 = RandomOctaveStage::to(2, -1, &hold_d110);
+    let seq2 = vec!(Rc::new(HoldingThru::using_device(&d110_midi_out)));
+
+    let oct_d110 = RandomOctaveStage::to(2, -1, &seq2[0]);
     let mapper_d110 = NoteMapThru::to(&scale, &oct_d110);
     let register_d110 = InputRegister::then(&mapper_d110);
     let dropper = RandomNoteDropper { next: &register_d110 };
