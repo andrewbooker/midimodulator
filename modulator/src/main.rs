@@ -136,7 +136,6 @@ fn modulate_d110(edirol: i32) {
             .take_while(|line| !line.is_empty())
             .collect();
 
-        println!("Request: {:#?}", http_request);
         count += 1;
         let interval = FixedEquivalentMillisInterval::new(1000 * count);
         let mut updater = PairedUpdater::new(&interval);
