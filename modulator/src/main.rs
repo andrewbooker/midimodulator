@@ -109,8 +109,8 @@ fn update_d110(updater: &mut PairedUpdater, d110_midi_out: &mut MidiOut) {
 }
 
 
-fn modulate_d110(edirol: i32) {
-    let mut d110_midi_out = MidiOut::using_device(edirol);
+fn modulate_d110(device_number: i32) {
+    let mut d110_midi_out = MidiOut::using_device(device_number);
     let d110_init = init_d110();
     d110_midi_out.send_sys_ex(&d110_init.to_send());
     for t in 1..9 {
@@ -155,7 +155,7 @@ fn modulate_d110(edirol: i32) {
 
 
 fn modulate_korg<C>(cmd_dump_rx: &Receiver<C>, res_tx: &Sender<HashMap<std::string::String, SweepState>>, first_tx: &Sender<i32>) {
-    let mut port = serialport::new("/dev/ttyUSB0", 38400)
+    let mut port = serialport::new("/dev/ttyS0", 38400)
                     .timeout(Duration::from_millis(1000))
                     .open()
                     .expect("Failed to open port");
@@ -203,14 +203,14 @@ fn modulate_korg<C>(cmd_dump_rx: &Receiver<C>, res_tx: &Sender<HashMap<std::stri
 
 
 fn main() {
-    let edirol = MidiOutDevices::index_of("edirol").unwrap();
-    let usb = MidiOutDevices::index_of("usb").unwrap();
-    println!("EDIROL (D110) port {}", edirol);
-    println!("USB (korg) port {}", usb);
+    let d110_number = MidiOutDevices::index_of("4i4o MIDI 4").unwrap();
+    let korg_number = MidiOutDevices::index_of("4i4o MIDI 3").unwrap();
+    println!("D110 port {}", d110_number);
+    println!("Korg port {}", korg_number);
 
-    thread::spawn(move || { modulate_d110(edirol); });
+    thread::spawn(move || { modulate_d110(d110_number); });
 
-    let mut midi_out = MidiOut::using_device(usb);
+    let mut midi_out = MidiOut::using_device(korg_number);
     midi_out.send_sys_ex(&KorgInitSysEx::new(0x02).data); // select prog
     midi_out.send(&MidiMessage::program(33, korg::CHANNEL)); // select 33
     thread::sleep(Duration::from_millis(100));
