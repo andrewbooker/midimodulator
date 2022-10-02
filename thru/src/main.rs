@@ -80,7 +80,7 @@ impl NoteStats {
             n => Some(n)
         }
     }
-    
+
     fn last_sent(&self) -> Option<u8> {
         match self.sent {
             0 => None,
@@ -236,7 +236,7 @@ impl <'a, S: MidiNoteSink>MidiNoteSink for NoteMapThru<'a, S> {
             note: self.scale.at(n.note),
             velocity: n.velocity
         };
-        
+
         self.next.receive(&transposed, stats);
     }
 }
@@ -360,8 +360,9 @@ fn index_of(substr: &str, input: &RtMidiIn) -> u32 {
 }
 
 
-const KORG_OUT: &str = "USB";
-const D110_OUT: &str = "EDIROL";
+const KORG_OUT: &str = "4i4o MIDI 3";
+const D110_OUT: &str = "4i4o MIDI 4";
+const MIDI_IN: &str = "4i4o MIDI 4";
 const NUM_PARTS: usize = 2;
 
 fn main() -> Result<(), RtMidiError> {
@@ -377,7 +378,7 @@ fn main() -> Result<(), RtMidiError> {
     for port in 0..input_ports {
         println!("Input {}: {}", port + 1, input.port_name(port)?);
     }
-    let input_port = index_of("USB", &input);
+    let input_port = index_of(MIDI_IN, &input);
     input.open_port(input_port, "RtMidi Input")?;
 
     let stats: [Mutex<NoteStats>; NUM_PARTS] = [
@@ -468,6 +469,6 @@ fn main() -> Result<(), RtMidiError> {
         }
 
     }
-    
+
     Ok(())
 }
