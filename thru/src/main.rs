@@ -136,14 +136,6 @@ struct InputRegister {
     next: Rc<dyn MidiNoteSink>
 }
 
-impl InputRegister {
-    fn then(next: Rc<dyn MidiNoteSink>) -> InputRegister {
-        InputRegister {
-            next: next
-        }
-    }
-}
-
 impl MidiNoteSink for InputRegister {
     fn receive(&self, n: &Note, stats: &mut NoteStats) {
         stats.put_received(&n);
@@ -155,18 +147,9 @@ impl MidiNoteSink for InputRegister {
 // SimpleThru
 
 struct SimpleThru {
-    midi_out: RtMidiOut
+    midi_out: Rc<RtMidiOut>
 }
 
-impl SimpleThru {
-    pub fn using_device(d: u32) -> SimpleThru {
-        let t = SimpleThru {
-            midi_out: RtMidiOut::new(Default::default()).unwrap()
-        };
-        t.midi_out.open_port(d, "SimpleThru out").unwrap();
-        t
-    }
-}
 
 impl MidiNoteSink for SimpleThru {
     fn receive(&self, n: &Note, _stats: &mut NoteStats) {
@@ -369,10 +352,25 @@ const NUM_PARTS: usize = 2;
 
 fn configure_korg(scale: Rc<Scale>, midi_out: Rc<RtMidiOut>) -> Rc<dyn MidiNoteSink> {
     let mut seq = Vec::<Rc<dyn MidiNoteSink>>::new();
-    seq.push(Rc::new(HoldingThru::using_device(midi_out)));
-    seq.push(Rc::new(RandomOctaveStage::to(4, 0, Rc::clone(&seq[0]))));
-    seq.push(Rc::new(NoteMapThru::to(scale, Rc::clone(&seq[1]))));
-    Rc::new(InputRegister::then(Rc::clone(&seq[2])))
+
+    let route = vec!("register", "noteMap", "randomOctaveTop", "hold");
+    match &route.last().unwrap()[..] {
+        "hold" => seq.push(Rc::new(HoldingThru::using_device(midi_out))),
+        _ => seq.push(Rc::new(SimpleThru { midi_out }))
+    }
+
+    for r in route.into_iter().rev() {
+        let next = Rc::clone(&seq[seq.len() - 1]);
+        match &r[..] {
+            "randomOctaveTop" => seq.push(Rc::new(RandomOctaveStage::to(4, 0, next))),
+            "randomOctaveBass" => seq.push(Rc::new(RandomOctaveStage::to(2, -1, next))),
+            "noteMap" => seq.push(Rc::new(NoteMapThru::to(Rc::clone(&scale), next))),
+            "register" => seq.push(Rc::new(InputRegister { next })),
+            "dropper" => seq.push(Rc::new(RandomNoteDropper { next })),
+            _ => {}
+        }
+    }
+    Rc::clone(&seq.last().unwrap())
 }
 
 
@@ -381,7 +379,7 @@ fn configure_d110(scale: Rc<Scale>, midi_out: Rc<RtMidiOut>) -> Rc<dyn MidiNoteS
     seq.push(Rc::new(HoldingThru::using_device(midi_out)));
     seq.push(Rc::new(RandomOctaveStage::to(2, -1, Rc::clone(&seq[0]))));
     seq.push(Rc::new(NoteMapThru::to(scale, Rc::clone(&seq[1]))));
-    seq.push(Rc::new(InputRegister::then(Rc::clone(&seq[2]))));
+    seq.push(Rc::new(InputRegister { next: Rc::clone(&seq[2]) }));
     Rc::new(RandomNoteDropper { next: Rc::clone(&seq[3]) })
 }
 
