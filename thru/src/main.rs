@@ -132,19 +132,19 @@ trait MidiNoteSink {
 }
 
 
-struct InputRegister<'a> {
-    next: &'a Rc<dyn MidiNoteSink>
+struct InputRegister {
+    next: Rc<dyn MidiNoteSink>
 }
 
-impl <'a>InputRegister<'a> {
-    fn then(next: &'a Rc<dyn MidiNoteSink>) -> InputRegister<'a> {
-        InputRegister::<'a> {
+impl InputRegister {
+    fn then(next: Rc<dyn MidiNoteSink>) -> InputRegister {
+        InputRegister {
             next: next
         }
     }
 }
 
-impl <'a>MidiNoteSink for InputRegister<'a> {
+impl MidiNoteSink for InputRegister {
     fn receive(&self, n: &Note, stats: &mut NoteStats) {
         stats.put_received(&n);
         self.next.receive(&n, stats);
@@ -367,6 +367,15 @@ const MIDI_IN: &str = "4i4o MIDI 4";
 const NUM_PARTS: usize = 2;
 
 
+fn config_korg(scale: Rc<Scale>, midi_out: Rc<RtMidiOut>) -> Rc<dyn MidiNoteSink> {
+    let mut seq1 = Vec::<Rc<dyn MidiNoteSink>>::new();
+    seq1.push(Rc::new(HoldingThru::using_device(midi_out)));
+    seq1.push(Rc::new(RandomOctaveStage::to(4, 0, Rc::clone(&seq1[0]))));
+    seq1.push(Rc::new(NoteMapThru::to(scale, Rc::clone(&seq1[1]))));
+    Rc::new(InputRegister::then(Rc::clone(&seq1[2])))
+}
+
+
 fn main() -> Result<(), RtMidiError> {
 
     let modes: HashMap<&str, Mode> = HashMap::from([
@@ -392,20 +401,16 @@ fn main() -> Result<(), RtMidiError> {
     let korg_midi_out = Rc::new(find_output_from(KORG_OUT));
     let d110_midi_out = Rc::new(find_output_from(D110_OUT));
 
-    let mut seq1 = Vec::<Rc<dyn MidiNoteSink>>::new();
-    seq1.push(Rc::new(HoldingThru::using_device(Rc::clone(&korg_midi_out))));
-    seq1.push(Rc::new(RandomOctaveStage::to(4, 0, Rc::clone(&seq1[0]))));
-    seq1.push(Rc::new(NoteMapThru::to(Rc::clone(&scale), Rc::clone(&seq1[1]))));
-    let register_korg = InputRegister::then(&seq1[2]);
+    let register_korg = config_korg(Rc::clone(&scale), Rc::clone(&korg_midi_out));
 
     let mut seq2 = Vec::<Rc<dyn MidiNoteSink>>::new();
     seq2.push(Rc::new(HoldingThru::using_device(Rc::clone(&d110_midi_out))));
     seq2.push(Rc::new(RandomOctaveStage::to(2, -1, Rc::clone(&seq2[0]))));
     seq2.push(Rc::new(NoteMapThru::to(Rc::clone(&scale), Rc::clone(&seq2[1]))));
-    let register_d110 = InputRegister::then(&seq2[2]);
-    let dropper = RandomNoteDropper { next: &register_d110 };
+    let register_d110 = InputRegister::then(Rc::clone(&seq2[2]));
+    let dropper = Rc::new(RandomNoteDropper { next: &register_d110 });
 
-    let parts: [&dyn MidiNoteSink; NUM_PARTS] = [&dropper, &register_korg];
+    let parts: [Rc<dyn MidiNoteSink>; NUM_PARTS] = [dropper, register_korg];
 
     let (midi_in_tx, midi_in_rx) = mpsc::channel();
     input.set_callback(|_timestamp, message| {
