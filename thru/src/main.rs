@@ -132,19 +132,19 @@ trait MidiNoteSink {
 }
 
 
-struct InputRegister<'a, S: MidiNoteSink> {
-    next: &'a S
+struct InputRegister<'a> {
+    next: &'a Rc<dyn MidiNoteSink>
 }
 
-impl <'a, S: MidiNoteSink>InputRegister<'a, S> {
-    fn then(next: &'a S) -> InputRegister<'a, S> {
-        InputRegister::<'a, S> {
+impl <'a>InputRegister<'a> {
+    fn then(next: &'a Rc<dyn MidiNoteSink>) -> InputRegister<'a> {
+        InputRegister::<'a> {
             next: next
         }
     }
 }
 
-impl <'a, S: MidiNoteSink>MidiNoteSink for InputRegister<'a, S> {
+impl <'a>MidiNoteSink for InputRegister<'a> {
     fn receive(&self, n: &Note, stats: &mut NoteStats) {
         stats.put_received(&n);
         self.next.receive(&n, stats);
@@ -217,21 +217,21 @@ impl Scale {
 
 // NoteMapThru
 
-struct NoteMapThru<'a> {
-    next: &'a Rc<dyn MidiNoteSink>,
-    scale: &'a Scale
+struct NoteMapThru {
+    next: Rc<dyn MidiNoteSink>,
+    scale: Rc<Scale>
 }
 
-impl <'a>NoteMapThru<'a> {
-    pub fn to(scale: &'a Scale, next: &'a Rc<dyn MidiNoteSink>) -> NoteMapThru<'a> {
-        NoteMapThru::<'a> {
+impl NoteMapThru {
+    pub fn to(scale: Rc<Scale>, next: Rc<dyn MidiNoteSink>) -> NoteMapThru {
+        NoteMapThru {
             next,
             scale
         }
     }
 }
 
-impl <'a>MidiNoteSink for NoteMapThru<'a> {
+impl MidiNoteSink for NoteMapThru {
     fn receive(&self, n: &Note, stats: &mut NoteStats) {
         let transposed = Note {
             note: self.scale.at(n.note),
@@ -388,23 +388,21 @@ fn main() -> Result<(), RtMidiError> {
         Mutex::new(NoteStats::recording())
     ];
 
-    let scale = Scale::from(48, &modes["lydian"]);
+    let scale = Rc::new(Scale::from(48, &modes["lydian"]));
     let korg_midi_out = Rc::new(find_output_from(KORG_OUT));
     let d110_midi_out = Rc::new(find_output_from(D110_OUT));
 
     let mut seq1 = Vec::<Rc<dyn MidiNoteSink>>::new();
     seq1.push(Rc::new(HoldingThru::using_device(Rc::clone(&korg_midi_out))));
     seq1.push(Rc::new(RandomOctaveStage::to(4, 0, Rc::clone(&seq1[0]))));
-
-    let mapper_korg = NoteMapThru::to(&scale, &seq1[1]);
-    let register_korg = InputRegister::then(&mapper_korg);
+    seq1.push(Rc::new(NoteMapThru::to(Rc::clone(&scale), Rc::clone(&seq1[1]))));
+    let register_korg = InputRegister::then(&seq1[2]);
 
     let mut seq2 = Vec::<Rc<dyn MidiNoteSink>>::new();
     seq2.push(Rc::new(HoldingThru::using_device(Rc::clone(&d110_midi_out))));
     seq2.push(Rc::new(RandomOctaveStage::to(2, -1, Rc::clone(&seq2[0]))));
-
-    let mapper_d110 = NoteMapThru::to(&scale, &seq2[1]);
-    let register_d110 = InputRegister::then(&mapper_d110);
+    seq2.push(Rc::new(NoteMapThru::to(Rc::clone(&scale), Rc::clone(&seq2[1]))));
+    let register_d110 = InputRegister::then(&seq2[2]);
     let dropper = RandomNoteDropper { next: &register_d110 };
 
     let parts: [&dyn MidiNoteSink; NUM_PARTS] = [&dropper, &register_korg];
