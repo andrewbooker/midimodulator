@@ -217,21 +217,21 @@ impl Scale {
 
 // NoteMapThru
 
-struct NoteMapThru<'a, S: MidiNoteSink> {
-    next: &'a S,
+struct NoteMapThru<'a> {
+    next: &'a Rc<dyn MidiNoteSink>,
     scale: &'a Scale
 }
 
-impl <'a, S: MidiNoteSink>NoteMapThru<'a, S> {
-    pub fn to(scale: &'a Scale, next: &'a S) -> NoteMapThru<'a, S> {
-        NoteMapThru::<'a, S> {
+impl <'a>NoteMapThru<'a> {
+    pub fn to(scale: &'a Scale, next: &'a Rc<dyn MidiNoteSink>) -> NoteMapThru<'a> {
+        NoteMapThru::<'a> {
             next,
             scale
         }
     }
 }
 
-impl <'a, S: MidiNoteSink>MidiNoteSink for NoteMapThru<'a, S> {
+impl <'a>MidiNoteSink for NoteMapThru<'a> {
     fn receive(&self, n: &Note, stats: &mut NoteStats) {
         let transposed = Note {
             note: self.scale.at(n.note),
@@ -261,15 +261,15 @@ impl <'a, S: MidiNoteSink>MidiNoteSink for RandomNoteDropper<'a, S> {
 
 // RandomOctaveStage
 
-struct RandomOctaveStage<'a, S: MidiNoteSink> {
+struct RandomOctaveStage {
     octave_range: u8,
     base: i8,
-    next: &'a Rc<S>
+    next: Rc<dyn MidiNoteSink>
 }
 
-impl <'a, S: MidiNoteSink>RandomOctaveStage<'a, S> {
-    pub fn to(octave_range: u8, base: i8, next: &'a Rc<S>) -> RandomOctaveStage<'a, S> {
-        RandomOctaveStage::<'a, S> {
+impl RandomOctaveStage {
+    pub fn to(octave_range: u8, base: i8, next: Rc<dyn MidiNoteSink>) -> RandomOctaveStage {
+        RandomOctaveStage {
             octave_range,
             base,
             next
@@ -277,7 +277,7 @@ impl <'a, S: MidiNoteSink>RandomOctaveStage<'a, S> {
     }
 }
 
-impl <'a, S: MidiNoteSink>MidiNoteSink for RandomOctaveStage<'a, S> {
+impl MidiNoteSink for RandomOctaveStage {
     fn receive(&self, n: &Note, stats: &mut NoteStats) {
         let r = rand::random::<f64>();
         let o = ((r * self.octave_range as f64) as i8) + self.base;
@@ -306,14 +306,14 @@ fn find_output_from(substr: &str) -> RtMidiOut {
 
 // HoldingThru
 
-struct HoldingThru<'a> {
-    midi_out: Rc<&'a RtMidiOut>
+struct HoldingThru<> {
+    midi_out: Rc<RtMidiOut>
 }
 
-impl <'a>HoldingThru<'a> {
-    pub fn using_device(m: &'a RtMidiOut) -> HoldingThru {
+impl HoldingThru {
+    pub fn using_device(midi_out: Rc<RtMidiOut>) -> HoldingThru {
         HoldingThru {
-            midi_out: Rc::new(m)
+            midi_out
         }
     }
 }
@@ -324,7 +324,7 @@ fn send_all_note_off(midi_out: &RtMidiOut) {
 }
 
 
-impl <'a>MidiNoteSink for HoldingThru<'a> {
+impl MidiNoteSink for HoldingThru {
     fn receive(&self, n: &Note, stats: &mut NoteStats) {
         if !stats.last_sent().is_none() {
             let ls = stats.last_sent().unwrap();
@@ -341,7 +341,7 @@ impl <'a>MidiNoteSink for HoldingThru<'a> {
     }
 }
 
-impl <'a>Drop for HoldingThru<'a> {
+impl Drop for HoldingThru {
     fn drop(&mut self) {
         send_all_note_off(&self.midi_out);
         println!("HoldingThru closed");
@@ -389,19 +389,21 @@ fn main() -> Result<(), RtMidiError> {
     ];
 
     let scale = Scale::from(48, &modes["lydian"]);
-    let korg_midi_out = find_output_from(KORG_OUT);
-    let d110_midi_out = find_output_from(D110_OUT);
+    let korg_midi_out = Rc::new(find_output_from(KORG_OUT));
+    let d110_midi_out = Rc::new(find_output_from(D110_OUT));
 
-    let seq1 = vec!(Rc::new(HoldingThru::using_device(&korg_midi_out)));
+    let mut seq1 = Vec::<Rc<dyn MidiNoteSink>>::new();
+    seq1.push(Rc::new(HoldingThru::using_device(Rc::clone(&korg_midi_out))));
+    seq1.push(Rc::new(RandomOctaveStage::to(4, 0, Rc::clone(&seq1[0]))));
 
-    let oct_korg = RandomOctaveStage::to(4, 0, &seq1[0]);
-    let mapper_korg = NoteMapThru::to(&scale, &oct_korg);
+    let mapper_korg = NoteMapThru::to(&scale, &seq1[1]);
     let register_korg = InputRegister::then(&mapper_korg);
 
-    let seq2 = vec!(Rc::new(HoldingThru::using_device(&d110_midi_out)));
+    let mut seq2 = Vec::<Rc<dyn MidiNoteSink>>::new();
+    seq2.push(Rc::new(HoldingThru::using_device(Rc::clone(&d110_midi_out))));
+    seq2.push(Rc::new(RandomOctaveStage::to(2, -1, Rc::clone(&seq2[0]))));
 
-    let oct_d110 = RandomOctaveStage::to(2, -1, &seq2[0]);
-    let mapper_d110 = NoteMapThru::to(&scale, &oct_d110);
+    let mapper_d110 = NoteMapThru::to(&scale, &seq2[1]);
     let register_d110 = InputRegister::then(&mapper_d110);
     let dropper = RandomNoteDropper { next: &register_d110 };
 
