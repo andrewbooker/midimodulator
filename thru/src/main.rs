@@ -350,10 +350,9 @@ const MIDI_IN: &str = "4i4o MIDI 4";
 const NUM_PARTS: usize = 2;
 
 
-fn configure_korg(scale: Rc<Scale>, midi_out: Rc<RtMidiOut>) -> Rc<dyn MidiNoteSink> {
+fn configure(route: Vec<&str>, scale: Rc<Scale>, midi_out: Rc<RtMidiOut>) -> Rc<dyn MidiNoteSink> {
     let mut seq = Vec::<Rc<dyn MidiNoteSink>>::new();
 
-    let route = vec!("register", "noteMap", "randomOctaveTop", "hold");
     match &route.last().unwrap()[..] {
         "hold" => seq.push(Rc::new(HoldingThru::using_device(midi_out))),
         _ => seq.push(Rc::new(SimpleThru { midi_out }))
@@ -373,15 +372,6 @@ fn configure_korg(scale: Rc<Scale>, midi_out: Rc<RtMidiOut>) -> Rc<dyn MidiNoteS
     Rc::clone(&seq.last().unwrap())
 }
 
-
-fn configure_d110(scale: Rc<Scale>, midi_out: Rc<RtMidiOut>) -> Rc<dyn MidiNoteSink> {
-    let mut seq = Vec::<Rc<dyn MidiNoteSink>>::new();
-    seq.push(Rc::new(HoldingThru::using_device(midi_out)));
-    seq.push(Rc::new(RandomOctaveStage::to(2, -1, Rc::clone(&seq[0]))));
-    seq.push(Rc::new(NoteMapThru::to(scale, Rc::clone(&seq[1]))));
-    seq.push(Rc::new(InputRegister { next: Rc::clone(&seq[2]) }));
-    Rc::new(RandomNoteDropper { next: Rc::clone(&seq[3]) })
-}
 
 fn main() -> Result<(), RtMidiError> {
 
@@ -408,9 +398,12 @@ fn main() -> Result<(), RtMidiError> {
     let korg_midi_out = Rc::new(find_output_from(KORG_OUT));
     let d110_midi_out = Rc::new(find_output_from(D110_OUT));
 
+    let korg = vec!("register", "noteMap", "randomOctaveTop", "hold");
+    let d110 = vec!("dropper", "register", "noteMap", "randomOctaveBass", "hold");
+
     let parts: [Rc<dyn MidiNoteSink>; NUM_PARTS] = [
-        configure_d110(Rc::clone(&scale), Rc::clone(&korg_midi_out)),
-        configure_korg(Rc::clone(&scale), Rc::clone(&d110_midi_out))
+        configure(d110, Rc::clone(&scale), Rc::clone(&d110_midi_out)),
+        configure(korg, Rc::clone(&scale), Rc::clone(&korg_midi_out))
     ];
 
     let (midi_in_tx, midi_in_rx) = mpsc::channel();
