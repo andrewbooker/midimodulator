@@ -198,23 +198,14 @@ impl Scale {
 }
 
 
-// NoteMapThru
+// NoteMap
 
-struct NoteMapThru {
+struct NoteMap {
     next: Rc<dyn MidiNoteSink>,
     scale: Rc<Scale>
 }
 
-impl NoteMapThru {
-    pub fn to(scale: Rc<Scale>, next: Rc<dyn MidiNoteSink>) -> NoteMapThru {
-        NoteMapThru {
-            next,
-            scale
-        }
-    }
-}
-
-impl MidiNoteSink for NoteMapThru {
+impl MidiNoteSink for NoteMap {
     fn receive(&self, n: &Note, stats: &mut NoteStats) {
         let transposed = Note {
             note: self.scale.at(n.note),
@@ -224,6 +215,27 @@ impl MidiNoteSink for NoteMapThru {
         self.next.receive(&transposed, stats);
     }
 }
+
+
+// RandomNoteMap
+
+struct RandomNoteMap {
+    next: Rc<dyn MidiNoteSink>,
+    scale: Rc<Scale>
+}
+
+impl MidiNoteSink for RandomNoteMap {
+    fn receive(&self, n: &Note, stats: &mut NoteStats) {
+        let r = rand::random::<f64>() * 8.0;
+        let randomised = Note {
+            note: self.scale.at(r.round() as u8),
+            velocity: n.velocity
+        };
+
+        self.next.receive(&randomised, stats);
+    }
+}
+
 
 
 // RandomNoteDropper
@@ -350,7 +362,7 @@ const MIDI_IN: &str = "4i4o MIDI 4";
 const NUM_PARTS: usize = 2;
 
 
-fn configure(route: &Vec<&str>, scale: Rc<Scale>, midi_out: Rc<RtMidiOut>) -> Rc<dyn MidiNoteSink> {
+fn configure(route: &Vec<&str>, s: Rc<Scale>, midi_out: Rc<RtMidiOut>) -> Rc<dyn MidiNoteSink> {
     let mut seq = Vec::<Rc<dyn MidiNoteSink>>::new();
 
     match &route.last().unwrap()[..] {
@@ -360,10 +372,12 @@ fn configure(route: &Vec<&str>, scale: Rc<Scale>, midi_out: Rc<RtMidiOut>) -> Rc
 
     for r in route.into_iter().rev() {
         let next = Rc::clone(&seq[seq.len() - 1]);
+        let scale = Rc::clone(&s);
         match &r[..] {
             "randomOctaveTop" => seq.push(Rc::new(RandomOctaveStage::to(4, 0, next))),
             "randomOctaveBass" => seq.push(Rc::new(RandomOctaveStage::to(2, -1, next))),
-            "noteMap" => seq.push(Rc::new(NoteMapThru::to(Rc::clone(&scale), next))),
+            "noteMap" => seq.push(Rc::new(NoteMap { next, scale })),
+            "randomNoteMap" => seq.push(Rc::new(RandomNoteMap { next, scale })),
             "register" => seq.push(Rc::new(InputRegister { next })),
             "dropper" => seq.push(Rc::new(RandomNoteDropper { next })),
             _ => {}
@@ -373,7 +387,7 @@ fn configure(route: &Vec<&str>, scale: Rc<Scale>, midi_out: Rc<RtMidiOut>) -> Rc
 }
 
 type TonicModeKorgD110 = (u8, &'static str, Vec<&'static str>, Vec<&'static str>);
-fn midi_input_routing() -> [TonicModeKorgD110; 2] {
+fn midi_input_routing() -> [TonicModeKorgD110; 3] {
     [
         (
             48,
@@ -386,6 +400,12 @@ fn midi_input_routing() -> [TonicModeKorgD110; 2] {
             "aeolian",
             vec!("dropper", "register", "noteMap", "randomOctaveTop", "hold"),
             vec!("dropper", "register", "noteMap", "randomOctaveBass", "hold")
+        ),
+        (
+            50,
+            "aeolian",
+            vec!("register", "randomNoteMap", "randomOctaveTop", "hold"),
+            vec!("register", "randomNoteMap", "randomOctaveBass", "hold")
         )
     ]
 }
@@ -394,7 +414,7 @@ fn midi_input_routing() -> [TonicModeKorgD110; 2] {
 fn main() -> Result<(), RtMidiError> {
 
     let modes: HashMap<&str, Mode> = HashMap::from([
-        ("aolian", [2, 1, 2, 2, 1, 2]),
+        ("aeolian", [2, 1, 2, 2, 1, 2]),
         ("lydian", [2, 2, 2, 1, 2, 2])
     ]);
 
@@ -415,7 +435,7 @@ fn main() -> Result<(), RtMidiError> {
     let korg_midi_out = Rc::new(find_output_from(KORG_OUT));
     let d110_midi_out = Rc::new(find_output_from(D110_OUT));
 
-    let (tonic, mode, korg, d110) = &midi_input_routing()[1];
+    let (tonic, mode, korg, d110) = &midi_input_routing()[2];
     let scale = Rc::new(Scale::from(*tonic, &modes[mode]));
 
     let parts: [Rc<dyn MidiNoteSink>; NUM_PARTS] = [
