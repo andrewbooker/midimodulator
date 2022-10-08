@@ -55,9 +55,6 @@ struct NoteStats {
 }
 
 
-
-
-
 impl NoteStats {
     fn basic() -> NoteStats {
         NoteStats {
@@ -349,6 +346,16 @@ impl Drop for HoldingThru {
 }
 
 
+// DeadEnd
+
+struct DeadEnd;
+
+impl MidiNoteSink for DeadEnd {
+    fn receive(&self, _: &Note, _: &mut NoteStats) {}
+}
+
+
+
 fn index_of(substr: &str, input: &RtMidiIn) -> u32 {
     for port in 0..input.port_count().unwrap() {
         let name = input.port_name(port).unwrap();
@@ -445,7 +452,7 @@ fn main() -> Result<(), RtMidiError> {
 
     let parts: [Rc<dyn MidiNoteSink>; NUM_PARTS] = [
         configure(d110, Rc::clone(&scale), Rc::clone(&d110_midi_out)),
-        configure(korg, Rc::clone(&scale), Rc::clone(&korg_midi_out))
+        Rc::new(DeadEnd {}) //configure(korg, Rc::clone(&scale), Rc::clone(&korg_midi_out))
     ];
 
     let (midi_in_tx, midi_in_rx) = mpsc::channel();
