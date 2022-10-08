@@ -297,17 +297,6 @@ impl Drop for OutputStage {
 }
 
 
-
-// DeadEnd
-
-struct DeadEnd;
-
-impl MidiNoteSink for DeadEnd {
-    fn receive(&self, _: &Note, _: &mut NoteStats) {}
-}
-
-
-
 fn index_of(substr: &str, input: &RtMidiIn) -> u32 {
     for port in 0..input.port_count().unwrap() {
         let name = input.port_name(port).unwrap();
@@ -329,14 +318,14 @@ const NUM_PARTS: usize = 2;
 fn configure(route: &Vec<&str>, s: Rc<Scale>, midi_out: Rc<RtMidiOut>) -> Rc<dyn MidiNoteSink> {
     let mut seq = Vec::<Rc<dyn MidiNoteSink>>::new();
 
-    let hold_length = 0;
+    let hold_length: u8 = route.last().unwrap().parse().unwrap();
     seq.push(Rc::new(OutputStage { midi_out, hold_length }));
 
     for r in route.into_iter().rev() {
         let next = Rc::clone(&seq[seq.len() - 1]);
         let scale = Rc::clone(&s);
         match &r[..] {
-            "randomOctaveTop" => seq.push(Rc::new(RandomOctaveStage::to(4, 0, next))),
+            "randomOctaveTop" => seq.push(Rc::new(RandomOctaveStage::to(3, 0, next))),
             "randomOctaveBass" => seq.push(Rc::new(RandomOctaveStage::to(2, -1, next))),
             "noteMap" => seq.push(Rc::new(NoteMap { next, scale })),
             "randomNoteMap" => seq.push(Rc::new(RandomNoteMap { next, scale })),
@@ -401,7 +390,7 @@ fn main() -> Result<(), RtMidiError> {
 
     let parts: [Rc<dyn MidiNoteSink>; NUM_PARTS] = [
         configure(d110, Rc::clone(&scale), Rc::clone(&d110_midi_out)),
-        Rc::new(DeadEnd {}) //configure(korg, Rc::clone(&scale), Rc::clone(&korg_midi_out))
+        configure(korg, Rc::clone(&scale), Rc::clone(&korg_midi_out))
     ];
 
     let (midi_in_tx, midi_in_rx) = mpsc::channel();
