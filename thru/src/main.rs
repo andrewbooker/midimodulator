@@ -373,11 +373,13 @@ fn configure(route: Vec<&str>, scale: Rc<Scale>, midi_out: Rc<RtMidiOut>) -> Rc<
 }
 
 
-fn midi_input_routing() -> (Vec<&'static str>, Vec<&'static str>) {
-    let korg = vec!("register", "noteMap", "randomOctaveTop", "hold");
-    let d110 = vec!("dropper", "register", "noteMap", "randomOctaveBass", "hold");
-
-    (korg, d110)
+fn midi_input_routing() -> (u8, &'static str, Vec<&'static str>, Vec<&'static str>) {
+    (
+        48,
+        "lydian",
+        vec!("register", "noteMap", "randomOctaveTop", "hold"),
+        vec!("dropper", "register", "noteMap", "randomOctaveBass", "hold")
+    )
 }
 
 
@@ -402,11 +404,11 @@ fn main() -> Result<(), RtMidiError> {
         Mutex::new(NoteStats::recording())
     ];
 
-    let scale = Rc::new(Scale::from(48, &modes["lydian"]));
     let korg_midi_out = Rc::new(find_output_from(KORG_OUT));
     let d110_midi_out = Rc::new(find_output_from(D110_OUT));
 
-    let (korg, d110) = midi_input_routing();
+    let (tonic, mode, korg, d110) = midi_input_routing();
+    let scale = Rc::new(Scale::from(tonic, &modes[mode]));
 
     let parts: [Rc<dyn MidiNoteSink>; NUM_PARTS] = [
         configure(d110, Rc::clone(&scale), Rc::clone(&d110_midi_out)),
