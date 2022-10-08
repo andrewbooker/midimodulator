@@ -52,23 +52,14 @@ impl Note {
 const NOTE_HISTORY: usize = 8;
 
 struct NoteStats {
-    received: [u8; NOTE_HISTORY],
-    record_on_play: bool
+    received: [u8; NOTE_HISTORY]
 }
 
 
 impl NoteStats {
-    fn basic() -> NoteStats {
+    fn new() -> NoteStats {
         NoteStats {
-            received: [0, 0, 0, 0, 0, 0, 0, 0],
-            record_on_play: false
-        }
-    }
-
-    fn recording() -> NoteStats {
-        NoteStats {
-            received: [0, 0, 0, 0, 0, 0, 0, 0],
-            record_on_play: true
+            received: [0, 0, 0, 0, 0, 0, 0, 0]
         }
     }
 
@@ -239,39 +230,52 @@ fn send_all_note_off(midi_out: &RtMidiOut) {
     midi_out.message(&[0xB0, 0x7B, 0]).unwrap();
 }
 
-fn note_on(n: &Note, midi_out: &RtMidiOut, stats: &mut NoteStats) {
-    midi_out.message(&[0x90, n.note, n.velocity]).unwrap();
-    stats.sending_note_on(n.note);
-}
-
-fn note_off(n: u8, midi_out: &RtMidiOut) {
-    midi_out.message(&[0x80, n, 0]).unwrap();
-}
-
 
 // OutputStage
 
 struct OutputStage {
     midi_out: Rc<RtMidiOut>,
-    hold_length: u8
+    hold_length: u8,
+    should_record: bool
 }
 
+impl OutputStage {
+    fn note_on(&self, n: &Note, stats: &mut NoteStats) {
+        self.midi_out.message(&[0x90, n.note, n.velocity]).unwrap();
+        stats.sending_note_on(n.note);
+        if self.should_record {
+            post_cmd_to_recorder(object!{
+                action: "on",
+                note: n.note
+            });
+        }
+    }
+
+    fn note_off(&self, n: u8) {
+        self.midi_out.message(&[0x80, n, 0]).unwrap();
+        if self.should_record {
+            post_cmd_to_recorder(object!{
+                action: "off"
+            });
+        }
+    }
+}
 
 impl MidiNoteSink for OutputStage {
     fn receive(&self, n: &Note, stats: &mut NoteStats) {
         if self.hold_length == 0 {
-            note_on(&n, &self.midi_out, stats);
+            self.note_on(&n, stats);
             thread::sleep(Duration::from_millis(40));
-            note_off(n.note, &self.midi_out);
+            self.note_off(n.note);
             return;
         }
     
         if self.hold_length == 1 {
             if n.note == stats.last() {
-                note_off(n.note, &self.midi_out);
+                self.note_off(n.note);
             } else {
-                note_off(stats.last(), &self.midi_out);
-                note_on(&n, &self.midi_out, stats);
+                self.note_off(stats.last());
+                self.note_on(&n, stats);
             }
             return;
         }
@@ -283,9 +287,9 @@ impl MidiNoteSink for OutputStage {
 
         let prev = stats.look_back(self.hold_length);
         if prev != 0 {
-            note_off(prev, &self.midi_out);
+            self.note_off(prev);
         }
-        note_on(&n, &self.midi_out, stats);
+        self.note_on(&n, stats);
     }
 }
 
@@ -318,8 +322,10 @@ const NUM_PARTS: usize = 2;
 fn configure(route: &Vec<&str>, s: Rc<Scale>, midi_out: Rc<RtMidiOut>) -> Rc<dyn MidiNoteSink> {
     let mut seq = Vec::<Rc<dyn MidiNoteSink>>::new();
 
-    let hold_length: u8 = route.last().unwrap().parse().unwrap();
-    seq.push(Rc::new(OutputStage { midi_out, hold_length }));
+    let os: Vec<&str> = route.last().unwrap().split("_").collect();
+    let hold_length: u8 = os[0].parse().unwrap();
+    let should_record = os.len() > 1 && os[1] == "R";
+    seq.push(Rc::new(OutputStage { midi_out, hold_length, should_record }));
 
     for r in route.into_iter().rev() {
         let next = Rc::clone(&seq[seq.len() - 1]);
@@ -349,7 +355,7 @@ fn midi_input_routing() -> [TonicModeKorgD110; 3] {
             49,
             "aeolian",
             vec!("dropper", "noteMap", "randomOctaveTop", "1"),
-            vec!("dropper", "noteMap", "randomOctaveBass", "1")
+            vec!("dropper", "noteMap", "randomOctaveBass", "1_R")
         ),
         (
             50,
@@ -378,14 +384,14 @@ fn main() -> Result<(), RtMidiError> {
     input.open_port(input_port, "RtMidi Input")?;
 
     let stats: [Mutex<NoteStats>; NUM_PARTS] = [
-        Mutex::new(NoteStats::basic()),
-        Mutex::new(NoteStats::recording())
+        Mutex::new(NoteStats::new()),
+        Mutex::new(NoteStats::new())
     ];
 
     let korg_midi_out = Rc::new(find_output_from(KORG_OUT));
     let d110_midi_out = Rc::new(find_output_from(D110_OUT));
 
-    let (tonic, mode, korg, d110) = &midi_input_routing()[2];
+    let (tonic, mode, korg, d110) = &midi_input_routing()[1];
     let scale = Rc::new(Scale::from(*tonic, &modes[mode]));
 
     let parts: [Rc<dyn MidiNoteSink>; NUM_PARTS] = [
