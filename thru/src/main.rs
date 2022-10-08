@@ -144,21 +144,6 @@ impl MidiNoteSink for InputRegister {
 }
 
 
-// SimpleThru
-
-struct SimpleThru {
-    midi_out: Rc<RtMidiOut>
-}
-
-
-impl MidiNoteSink for SimpleThru {
-    fn receive(&self, n: &Note, _stats: &mut NoteStats) {
-        self.midi_out.message(&[0x90, n.note, n.velocity]).unwrap();
-        self.midi_out.message(&[0x80, n.note, 0]).unwrap();
-    }
-}
-
-
 // Scale
 
 type Mode = [u8; 6];
@@ -299,23 +284,44 @@ fn find_output_from(substr: &str) -> RtMidiOut {
 }
 
 
-// HoldingThru
+fn send_all_note_off(midi_out: &RtMidiOut) {
+    midi_out.message(&[0xB0, 0x7B, 0]).unwrap();
+}
 
-struct HoldingThru<> {
+fn note_on(n: &Note, midi_out: &RtMidiOut, stats: &mut NoteStats) {
+    midi_out.message(&[0x90, n.note, n.velocity]).unwrap();
+    stats.put_sent(&n);
+}
+
+fn note_off(n: u8, midi_out: &RtMidiOut) {
+    midi_out.message(&[0x80, n, 0]).unwrap();
+}
+
+// SimpleThru
+
+struct ChordalThru {
     midi_out: Rc<RtMidiOut>
 }
 
-impl HoldingThru {
-    pub fn using_device(midi_out: Rc<RtMidiOut>) -> HoldingThru {
-        HoldingThru {
-            midi_out
-        }
+
+impl MidiNoteSink for ChordalThru {
+    fn receive(&self, n: &Note, stats: &mut NoteStats) {
+        note_on(&n, &self.midi_out, stats);
+    }
+}
+
+impl Drop for ChordalThru {
+    fn drop(&mut self) {
+        send_all_note_off(&self.midi_out);
+        println!("SimpleThru closed");
     }
 }
 
 
-fn send_all_note_off(midi_out: &RtMidiOut) {
-    midi_out.message(&[0xB0, 0x7B, 0]).unwrap();
+// HoldingThru
+
+struct HoldingThru<> {
+    midi_out: Rc<RtMidiOut>
 }
 
 
@@ -323,13 +329,12 @@ impl MidiNoteSink for HoldingThru {
     fn receive(&self, n: &Note, stats: &mut NoteStats) {
         if !stats.last_sent().is_none() {
             let ls = stats.last_sent().unwrap();
-            self.midi_out.message(&[0x80, ls, 0]).unwrap();
+            note_off(ls, &self.midi_out);
             stats.put_cleared();
         }
 
         if stats.last_sent().is_none() || stats.last_sent().unwrap() != n.note {
-            self.midi_out.message(&[0x90, n.note, n.velocity]).unwrap();
-            stats.put_sent(&n);
+            note_on(&n, &self.midi_out, stats);
         } else {
             stats.clear();
         }
@@ -366,8 +371,8 @@ fn configure(route: &Vec<&str>, s: Rc<Scale>, midi_out: Rc<RtMidiOut>) -> Rc<dyn
     let mut seq = Vec::<Rc<dyn MidiNoteSink>>::new();
 
     match &route.last().unwrap()[..] {
-        "hold" => seq.push(Rc::new(HoldingThru::using_device(midi_out))),
-        _ => seq.push(Rc::new(SimpleThru { midi_out }))
+        "hold" => seq.push(Rc::new(HoldingThru { midi_out })),
+        _ => seq.push(Rc::new(ChordalThru { midi_out }))
     }
 
     for r in route.into_iter().rev() {
@@ -404,8 +409,8 @@ fn midi_input_routing() -> [TonicModeKorgD110; 3] {
         (
             50,
             "aeolian",
-            vec!("register", "randomNoteMap", "randomOctaveTop", "hold"),
-            vec!("register", "randomNoteMap", "randomOctaveBass", "hold")
+            vec!("register", "randomNoteMap", "randomOctaveTop", "chord"),
+            vec!("register", "randomNoteMap", "randomOctaveBass", "chord")
         )
     ]
 }
