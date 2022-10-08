@@ -350,7 +350,7 @@ const MIDI_IN: &str = "4i4o MIDI 4";
 const NUM_PARTS: usize = 2;
 
 
-fn configure(route: Vec<&str>, scale: Rc<Scale>, midi_out: Rc<RtMidiOut>) -> Rc<dyn MidiNoteSink> {
+fn configure(route: &Vec<&str>, scale: Rc<Scale>, midi_out: Rc<RtMidiOut>) -> Rc<dyn MidiNoteSink> {
     let mut seq = Vec::<Rc<dyn MidiNoteSink>>::new();
 
     match &route.last().unwrap()[..] {
@@ -372,14 +372,22 @@ fn configure(route: Vec<&str>, scale: Rc<Scale>, midi_out: Rc<RtMidiOut>) -> Rc<
     Rc::clone(&seq.last().unwrap())
 }
 
-
-fn midi_input_routing() -> (u8, &'static str, Vec<&'static str>, Vec<&'static str>) {
-    (
-        48,
-        "lydian",
-        vec!("register", "noteMap", "randomOctaveTop", "hold"),
-        vec!("dropper", "register", "noteMap", "randomOctaveBass", "hold")
-    )
+type TonicModeKorgD110 = (u8, &'static str, Vec<&'static str>, Vec<&'static str>);
+fn midi_input_routing() -> [TonicModeKorgD110; 2] {
+    [
+        (
+            48,
+            "lydian",
+            vec!("register", "noteMap", "randomOctaveTop", "hold"),
+            vec!("dropper", "register", "noteMap", "randomOctaveBass", "hold")
+        ),
+        (
+            49,
+            "aeolian",
+            vec!("dropper", "register", "noteMap", "randomOctaveTop", "hold"),
+            vec!("dropper", "register", "noteMap", "randomOctaveBass", "hold")
+        )
+    ]
 }
 
 
@@ -407,8 +415,8 @@ fn main() -> Result<(), RtMidiError> {
     let korg_midi_out = Rc::new(find_output_from(KORG_OUT));
     let d110_midi_out = Rc::new(find_output_from(D110_OUT));
 
-    let (tonic, mode, korg, d110) = midi_input_routing();
-    let scale = Rc::new(Scale::from(tonic, &modes[mode]));
+    let (tonic, mode, korg, d110) = &midi_input_routing()[1];
+    let scale = Rc::new(Scale::from(*tonic, &modes[mode]));
 
     let parts: [Rc<dyn MidiNoteSink>; NUM_PARTS] = [
         configure(d110, Rc::clone(&scale), Rc::clone(&d110_midi_out)),
