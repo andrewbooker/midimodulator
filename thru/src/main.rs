@@ -48,9 +48,11 @@ impl Note {
     }
 }
 
+
+const NOTE_HISTORY: usize = 8;
+
 struct NoteStats {
-    received: u8,
-    sent: u8,
+    received: [u8; NOTE_HISTORY],
     record_on_play: bool
 }
 
@@ -58,67 +60,31 @@ struct NoteStats {
 impl NoteStats {
     fn basic() -> NoteStats {
         NoteStats {
-            received: 0,
-            sent: 0,
+            received: [0, 0, 0, 0, 0, 0, 0, 0],
             record_on_play: false
         }
     }
 
     fn recording() -> NoteStats {
         NoteStats {
-            received: 0,
-            sent: 0,
+            received: [0, 0, 0, 0, 0, 0, 0, 0],
             record_on_play: true
         }
     }
 
-    fn last_received(&self) -> Option<u8> {
-        match self.received {
-            0 => None,
-            n => Some(n)
-        }
+    fn last(&self) -> u8 {
+        self.received[NOTE_HISTORY - 1]
     }
 
-    fn last_sent(&self) -> Option<u8> {
-        match self.sent {
-            0 => None,
-            n => Some(n)
-        }
+    fn look_back(&self, b: u8) -> u8 {
+        self.received[NOTE_HISTORY - usize::from(b)]
     }
 
-    fn put_received(&mut self, n: &Note) {
-        if self.received != n.note {
-            self.received = n.note;
-        } else {
-            self.received = 0;
+    fn sending_note_on(&mut self, n: u8) {
+        for i in 1..NOTE_HISTORY {
+            self.received[i - 1] = self.received[i];
         }
-    }
-
-    fn put_sent(&mut self, n: &Note) {
-        if self.sent != n.note {
-            self.sent = n.note;
-            if self.record_on_play {
-                post_cmd_to_recorder(object!{
-                    action: "on",
-                    note: n.note
-                });
-            }
-        } else {
-            self.sent = 0;
-        }
-    }
-
-    fn put_cleared(&self) {
-        if self.record_on_play {
-            post_cmd_to_recorder(object!{
-                action: "off"
-            });
-        }
-    }
-
-    fn clear(&mut self) {
-        self.sent = 0;
-        self.received = 0;
+        self.received[NOTE_HISTORY - 1] = n;
     }
 }
 
@@ -128,17 +94,6 @@ trait MidiNoteSink {
     fn receive(&self, note: &Note, stats: &mut NoteStats);
 }
 
-
-struct InputRegister {
-    next: Rc<dyn MidiNoteSink>
-}
-
-impl MidiNoteSink for InputRegister {
-    fn receive(&self, n: &Note, stats: &mut NoteStats) {
-        stats.put_received(&n);
-        self.next.receive(&n, stats);
-    }
-}
 
 
 // Scale
@@ -219,7 +174,6 @@ impl MidiNoteSink for RandomNoteMap {
 }
 
 
-
 // RandomNoteDropper
 
 struct RandomNoteDropper {
@@ -287,63 +241,61 @@ fn send_all_note_off(midi_out: &RtMidiOut) {
 
 fn note_on(n: &Note, midi_out: &RtMidiOut, stats: &mut NoteStats) {
     midi_out.message(&[0x90, n.note, n.velocity]).unwrap();
-    stats.put_sent(&n);
+    stats.sending_note_on(n.note);
 }
 
 fn note_off(n: u8, midi_out: &RtMidiOut) {
     midi_out.message(&[0x80, n, 0]).unwrap();
 }
 
-// SimpleThru
 
-struct ChordalThru {
-    midi_out: Rc<RtMidiOut>
+// OutputStage
+
+struct OutputStage {
+    midi_out: Rc<RtMidiOut>,
+    hold_length: u8
 }
 
 
-impl MidiNoteSink for ChordalThru {
+impl MidiNoteSink for OutputStage {
     fn receive(&self, n: &Note, stats: &mut NoteStats) {
+        if self.hold_length == 0 {
+            note_on(&n, &self.midi_out, stats);
+            thread::sleep(Duration::from_millis(40));
+            note_off(n.note, &self.midi_out);
+            return;
+        }
+    
+        if self.hold_length == 1 {
+            if n.note == stats.last() {
+                note_off(n.note, &self.midi_out);
+            } else {
+                note_off(stats.last(), &self.midi_out);
+                note_on(&n, &self.midi_out, stats);
+            }
+            return;
+        }
+
+        if n.note == stats.last() {
+            println!("Ignoring {} same as last with hold length {}", n.note, self.hold_length);
+            return;
+        }
+
+        let prev = stats.look_back(self.hold_length);
+        if prev != 0 {
+            note_off(prev, &self.midi_out);
+        }
         note_on(&n, &self.midi_out, stats);
     }
 }
 
-impl Drop for ChordalThru {
+impl Drop for OutputStage {
     fn drop(&mut self) {
         send_all_note_off(&self.midi_out);
-        println!("SimpleThru closed");
+        println!("OutputStage closed");
     }
 }
 
-
-// HoldingThru
-
-struct HoldingThru<> {
-    midi_out: Rc<RtMidiOut>
-}
-
-
-impl MidiNoteSink for HoldingThru {
-    fn receive(&self, n: &Note, stats: &mut NoteStats) {
-        if !stats.last_sent().is_none() {
-            let ls = stats.last_sent().unwrap();
-            note_off(ls, &self.midi_out);
-            stats.put_cleared();
-        }
-
-        if stats.last_sent().is_none() || stats.last_sent().unwrap() != n.note {
-            note_on(&n, &self.midi_out, stats);
-        } else {
-            stats.clear();
-        }
-    }
-}
-
-impl Drop for HoldingThru {
-    fn drop(&mut self) {
-        send_all_note_off(&self.midi_out);
-        println!("HoldingThru closed");
-    }
-}
 
 
 // DeadEnd
@@ -377,10 +329,8 @@ const NUM_PARTS: usize = 2;
 fn configure(route: &Vec<&str>, s: Rc<Scale>, midi_out: Rc<RtMidiOut>) -> Rc<dyn MidiNoteSink> {
     let mut seq = Vec::<Rc<dyn MidiNoteSink>>::new();
 
-    match &route.last().unwrap()[..] {
-        "hold" => seq.push(Rc::new(HoldingThru { midi_out })),
-        _ => seq.push(Rc::new(ChordalThru { midi_out }))
-    }
+    let hold_length = 0;
+    seq.push(Rc::new(OutputStage { midi_out, hold_length }));
 
     for r in route.into_iter().rev() {
         let next = Rc::clone(&seq[seq.len() - 1]);
@@ -390,7 +340,6 @@ fn configure(route: &Vec<&str>, s: Rc<Scale>, midi_out: Rc<RtMidiOut>) -> Rc<dyn
             "randomOctaveBass" => seq.push(Rc::new(RandomOctaveStage::to(2, -1, next))),
             "noteMap" => seq.push(Rc::new(NoteMap { next, scale })),
             "randomNoteMap" => seq.push(Rc::new(RandomNoteMap { next, scale })),
-            "register" => seq.push(Rc::new(InputRegister { next })),
             "dropper" => seq.push(Rc::new(RandomNoteDropper { next })),
             _ => {}
         }
@@ -404,20 +353,20 @@ fn midi_input_routing() -> [TonicModeKorgD110; 3] {
         (
             48,
             "lydian",
-            vec!("register", "noteMap", "randomOctaveTop", "hold"),
-            vec!("dropper", "register", "noteMap", "randomOctaveBass", "hold")
+            vec!("noteMap", "randomOctaveTop", "1"),
+            vec!("dropper", "noteMap", "randomOctaveBass", "1")
         ),
         (
             49,
             "aeolian",
-            vec!("dropper", "register", "noteMap", "randomOctaveTop", "hold"),
-            vec!("dropper", "register", "noteMap", "randomOctaveBass", "hold")
+            vec!("dropper", "noteMap", "randomOctaveTop", "1"),
+            vec!("dropper", "noteMap", "randomOctaveBass", "1")
         ),
         (
             50,
             "aeolian",
-            vec!("register", "randomNoteMap", "randomOctaveTop", "chord"),
-            vec!("register", "randomNoteMap", "randomOctaveBass", "chord")
+            vec!("randomNoteMap", "randomOctaveTop", "3"),
+            vec!("randomNoteMap", "randomOctaveTop", "3")
         )
     ]
 }
