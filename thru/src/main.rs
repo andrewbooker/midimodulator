@@ -373,6 +373,14 @@ fn configure(route: Vec<&str>, scale: Rc<Scale>, midi_out: Rc<RtMidiOut>) -> Rc<
 }
 
 
+fn midi_input_routing() -> (Vec<&'static str>, Vec<&'static str>) {
+    let korg = vec!("register", "noteMap", "randomOctaveTop", "hold");
+    let d110 = vec!("dropper", "register", "noteMap", "randomOctaveBass", "hold");
+
+    (korg, d110)
+}
+
+
 fn main() -> Result<(), RtMidiError> {
 
     let modes: HashMap<&str, Mode> = HashMap::from([
@@ -398,8 +406,7 @@ fn main() -> Result<(), RtMidiError> {
     let korg_midi_out = Rc::new(find_output_from(KORG_OUT));
     let d110_midi_out = Rc::new(find_output_from(D110_OUT));
 
-    let korg = vec!("register", "noteMap", "randomOctaveTop", "hold");
-    let d110 = vec!("dropper", "register", "noteMap", "randomOctaveBass", "hold");
+    let (korg, d110) = midi_input_routing();
 
     let parts: [Rc<dyn MidiNoteSink>; NUM_PARTS] = [
         configure(d110, Rc::clone(&scale), Rc::clone(&d110_midi_out)),
