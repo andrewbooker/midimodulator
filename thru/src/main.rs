@@ -348,14 +348,14 @@ fn midi_input_routing() -> [TonicModeKorgD110; 3] {
         (
             48,
             "lydian",
-            vec!("noteMap", "randomOctaveTop", "1"),
+            vec!("noteMap", "randomOctaveTop", "1_R"),
             vec!("dropper", "noteMap", "randomOctaveBass", "1")
         ),
         (
             49,
             "aeolian",
-            vec!("dropper", "noteMap", "randomOctaveTop", "1"),
-            vec!("dropper", "noteMap", "randomOctaveBass", "1_R")
+            vec!("dropper", "noteMap", "randomOctaveTop", "3"),
+            vec!("dropper", "noteMap", "randomOctaveBass", "1")
         ),
         (
             50,
@@ -399,7 +399,6 @@ fn main() -> Result<(), RtMidiError> {
         configure(korg, Rc::clone(&scale), Rc::clone(&korg_midi_out))
     ];
 
-    let (midi_in_tx, midi_in_rx) = mpsc::channel();
     input.set_callback(|_timestamp, message| {
         if message[0] == 0x90 && message[2] != 0 {
             let n = Note::from_midi_message(&message);
@@ -408,23 +407,15 @@ fn main() -> Result<(), RtMidiError> {
                 let mut st = stats[i].lock().unwrap();
                 parts[i].receive(&n, &mut st);
             }
-
-            midi_in_tx.send(n.note).unwrap();
+            thread::spawn(move || {
+                post_cmd_to_modulator();
+            });
         }
     })?;
 
     input.ignore_types(true, true, true)?;
 
     println!("Starting...");
-
-    thread::spawn(move || {
-        loop {
-            match midi_in_rx.try_recv() {
-                Ok(_) => post_cmd_to_modulator(),
-                _ => thread::sleep(Duration::from_millis(100))
-            }
-        }
-    });
 
     let (cmd_stop_tx, cmd_stop_rx) = mpsc::channel();
     let (cmd_note_off_tx, cmd_note_off_rx) = mpsc::channel();
