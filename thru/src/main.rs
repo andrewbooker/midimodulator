@@ -171,11 +171,35 @@ struct RandomNoteDropper {
     next: Rc<dyn MidiNoteSink>
 }
 
+impl RandomNoteDropper {
+    fn should_play() -> bool {
+        rand::random::<f64>() > 0.7
+    }
+}
+
 impl MidiNoteSink for RandomNoteDropper {
     fn receive(&self, n: &Note, stats: &mut NoteStats) {
-        let r = rand::random::<f64>();
-        if r > 0.7 {
+        if Self::should_play() {
             self.next.receive(n, stats);
+        }
+    }
+}
+
+
+// NotifyingRandomNoteDropper
+
+struct NotifyingRandomNoteDropper {
+    next: Rc<dyn MidiNoteSink>
+}
+
+impl MidiNoteSink for NotifyingRandomNoteDropper {
+    fn receive(&self, n: &Note, stats: &mut NoteStats) {
+        if RandomNoteDropper::should_play() {
+            self.next.receive(n, stats);
+        } else {
+            thread::spawn(move || {
+                post_cmd_to_modulator();
+            });
         }
     }
 }
@@ -336,6 +360,7 @@ fn configure(route: &Vec<&str>, s: Rc<Scale>, midi_out: Rc<RtMidiOut>) -> Rc<dyn
             "noteMap" => seq.push(Rc::new(NoteMap { next, scale })),
             "randomNoteMap" => seq.push(Rc::new(RandomNoteMap { next, scale })),
             "dropper" => seq.push(Rc::new(RandomNoteDropper { next })),
+            "notifyingDropper" => seq.push(Rc::new(NotifyingRandomNoteDropper { next })),
             _ => {}
         }
     }
@@ -355,7 +380,7 @@ fn midi_input_routing() -> [TonicModeKorgD110; 3] {
             49,
             "aeolian",
             vec!("dropper", "noteMap", "randomOctaveTop", "3"),
-            vec!("dropper", "noteMap", "randomOctaveBass", "1")
+            vec!("notifyingDropper", "noteMap", "randomOctaveBass", "1")
         ),
         (
             50,
@@ -407,9 +432,6 @@ fn main() -> Result<(), RtMidiError> {
                 let mut st = stats[i].lock().unwrap();
                 parts[i].receive(&n, &mut st);
             }
-            thread::spawn(move || {
-                post_cmd_to_modulator();
-            });
         }
     })?;
 

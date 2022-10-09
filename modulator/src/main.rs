@@ -137,19 +137,16 @@ fn modulate_d110(device_number: i32) {
             .collect();
 
         count += 1;
-        let interval = FixedEquivalentMillisInterval::new(1000 * count);
-        let mut updater = PairedUpdater::new(&interval);
-
-        update_d110(&mut updater, &mut d110_midi_out);
-        println!("part1 updated");
 
         let status_line = "HTTP/1.1 200 OK";
         let contents = json::stringify(vec![0]);
         let length = contents.len();
-
         let response = format!("{status_line}\r\nContent-Type: application/json; charset=UTF-8\r\nContent-Length: {length}\r\n\r\n{contents}");
-
         stream.write_all(response.as_bytes()).unwrap();
+
+        let interval = FixedEquivalentMillisInterval::new(1000 * count);
+        let mut updater = PairedUpdater::new(&interval);
+        update_d110(&mut updater, &mut d110_midi_out);
     }
 }
 
