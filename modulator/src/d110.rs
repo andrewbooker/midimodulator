@@ -78,8 +78,8 @@ impl SysExComposer for D110SysEx {
 
 
 pub fn init_d110() -> D110SysEx {
-    const RES_ALLOWANCE_FOR_PARTIALS: [u8; 9] = [32, 0, 0, 0, 0, 0, 0, 0, 0];
-    const MIDI_CHANNELS: [u8; 9] = [1, 9, 9, 9, 9, 9, 9, 9, 10];
+    const RES_ALLOWANCE_FOR_PARTIALS: [u8; 9] = [16, 16, 0, 0, 0, 0, 0, 0, 0];
+    const MIDI_CHANNELS: [u8; 9] = [9, 1, 9, 9, 9, 9, 9, 9, 10];
 
     let mut sys_ex = D110SysEx::new();
 
@@ -99,16 +99,22 @@ pub fn init_d110() -> D110SysEx {
 pub fn init_timbre(number: u8) -> D110SysEx {
     let mut sys_ex = D110SysEx::new();
     
-    sys_ex.data_vec_u8(vec![0x03, 0x00, 0x02 + (0x10 * (number - 1))]); // address
+    let addr = vec![0x03, 0x00, (0x10 * (number - 1))];
+    // timbre
+    sys_ex.data_vec_u8(addr); // address
+    sys_ex.data_u8(2); // tone group
+    sys_ex.data_u8(number - 1); // tone number
     sys_ex.data_u8(24); // keyShift in semitones, 24 = 0 shift, 27 = +3
     sys_ex.data_u8(50); // fineTune +/- 50, 50 = 0
     sys_ex.data_u8(12); // benderRange semitones, 0-24
     sys_ex.data_u8(2); // note priority monoLast = 0, monoFirst, polyLast, polyFirst
-    sys_ex.data_u8(7); // outputAssign 1=mix?
+    sys_ex.data_u8(if number < 3 { number + 1 } else { 0 }); // outputAssign 1=mix?
     sys_ex.data_u8(0); // dummy/reverb off
-    sys_ex.data_u8(if number == 1 { 98 } else { 0 });  // outputLevel max 100
+
+    // part
+    sys_ex.data_u8(if number < 3 { 90 + number } else { 0 });  // outputLevel max 100
     sys_ex.data_u8(7);  // pan 7 = mid, 0 = R, 15 = L
-    sys_ex.data_u8(if number == 1 { 0 } else { 0x7F }); // keyRangeLower 0 = C-1
+    sys_ex.data_u8(if number < 3 { 0 } else { 0x7F }); // keyRangeLower 0 = C-1
     sys_ex.data_u8(0x7F); // keyRangeUpper 127 = G9
     sys_ex.data_u8(0);
     sys_ex.data_u8(0);
@@ -119,27 +125,29 @@ pub fn init_timbre(number: u8) -> D110SysEx {
 }
 
 
-fn address_of(part_number: u8) -> u32 {
-    if part_number == 1 {
+fn address_of(tone_number: u8) -> u32 {
+    if tone_number == 1 {
         0x040000
     } else {
-        0x040176 + (502 * (part_number as u32 - 2))
+        0x040176 + (502 * (tone_number as u32 - 2))
     }
 }
 
-pub fn set_up_part(number: u8) -> D110SysEx {
+pub fn set_up_tone(number: u8) -> D110SysEx {
     let mut sys_ex = D110SysEx::new();
 
     let a = address_of(number);
     let a_vec = vec![(a >> 16) as u8, ((a >> 8) & 0xFF) as u8, (a & 0xFF) as u8];
 
     sys_ex.data_vec_u8(a_vec); // address
-    sys_ex.data_str(if number == 1 { "part" } else { "mute" });
+    //tone name
+    sys_ex.data_str(if number < 3 { "tone" } else { "mute" });
     sys_ex.data_u8(number + 0x30);
     sys_ex.data_vec_u8([0x20; 5].to_vec());
+    //
     sys_ex.data_u8(0); // 0 = ss, 5 = pp
     sys_ex.data_u8(0); // 0 = ss, 5 = pp
-    sys_ex.data_u8(if number == 1 { 0xF } else { 0 });
+    sys_ex.data_u8(if number < 3 { 0xF } else { 0 }); // partial enable
     sys_ex.data_u8(0); // envelope mode
     sys_ex
 }
