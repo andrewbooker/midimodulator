@@ -140,9 +140,11 @@ impl PairedUpdater<'_> {
                         if 1 == idx {
                             osc_selector.next1();
                             effect_selector.next1();
+                            println!("new eff1 {}", effect_selector.val(1));
                         } else {
                             osc_selector.next2();
                             effect_selector.next2();
+                            println!("new eff2 {}", effect_selector.val(2));
                         }
                         println!("{} change {}", key, osc_selector.val(idx));
                     }

@@ -364,14 +364,25 @@ impl <'a>KorgEffectSelector<'a> {
 
 impl <'a>Selector for KorgEffectSelector<'a> {
     fn next1(&mut self) {
-        self.eff1 = &AVAILABLE_EFFECTS.choose(&mut rand::thread_rng()).unwrap();
+        let new_eff = &AVAILABLE_EFFECTS.choose(&mut rand::thread_rng()).unwrap();
+        if new_eff.number == self.eff1.number {
+            self.next1();
+        }
+        self.eff1 = new_eff;
     }
 
     fn next2(&mut self) {
-        self.eff2 = &AVAILABLE_EFFECTS.choose(&mut rand::thread_rng()).unwrap();
+        let new_eff = &AVAILABLE_EFFECTS.choose(&mut rand::thread_rng()).unwrap();
+        if new_eff.number == self.eff2.number {
+            self.next2();
+        }
+        self.eff2 = new_eff;
     }
 
-    fn val(&self, _: u8) -> u16 {
-        0
+    fn val(&self, idx: u8) -> u16 {
+        if idx == 1 {
+            return self.eff1.number as u16
+        }
+        self.eff2.number as u16
     }
 }
