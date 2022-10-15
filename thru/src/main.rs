@@ -305,7 +305,6 @@ impl MidiNoteSink for OutputStage {
         }
 
         if n.note == stats.last() {
-            println!("Ignoring {} same as last with hold length {}", n.note, self.hold_length);
             return;
         }
 
