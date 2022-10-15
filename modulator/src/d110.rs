@@ -138,7 +138,7 @@ pub fn set_up_part(number: u8) -> D110SysEx {
     sys_ex.data_u8(number + 0x30);
     sys_ex.data_vec_u8([0x20; 5].to_vec());
     sys_ex.data_u8(0); // 0 = ss, 5 = pp
-    sys_ex.data_u8(5); // 0 = ss, 5 = pp
+    sys_ex.data_u8(0); // 0 = ss, 5 = pp
     sys_ex.data_u8(if number == 1 { 0xF } else { 0 });
     sys_ex.data_u8(0); // envelope mode
     sys_ex
