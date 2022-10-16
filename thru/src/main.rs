@@ -50,32 +50,33 @@ impl Note {
 
 
 const NOTE_HISTORY: usize = 8;
+type PlayedNote = (u8, u8);
 
 struct NoteStats {
-    received: [u8; NOTE_HISTORY]
+    received: [PlayedNote; NOTE_HISTORY]
 }
 
 
 impl NoteStats {
     fn new() -> NoteStats {
         NoteStats {
-            received: [0, 0, 0, 0, 0, 0, 0, 0]
+            received: [(0, 0); NOTE_HISTORY]
         }
     }
 
-    fn last(&self) -> u8 {
+    fn last(&self) -> PlayedNote {
         self.received[NOTE_HISTORY - 1]
     }
 
     fn look_back(&self, b: u8) -> u8 {
-        self.received[NOTE_HISTORY - usize::from(b)]
+        self.received[NOTE_HISTORY - usize::from(b)].0
     }
 
-    fn sending_note_on(&mut self, n: u8) {
+    fn sending_note_on(&mut self, n: u8, c: u8) {
         for i in 1..NOTE_HISTORY {
             self.received[i - 1] = self.received[i];
         }
-        self.received[NOTE_HISTORY - 1] = n;
+        self.received[NOTE_HISTORY - 1] = (n, c);
     }
 }
 
@@ -267,16 +268,17 @@ struct OutputStage {
 }
 
 impl OutputStage {
-    fn channel(&self, _: &NoteStats) -> u8 {
+    fn channel(&self, stats: &NoteStats) -> u8 {
         if !self.channel_range {
             return 0;
         }
-        return 1;
+        return (stats.last().1 + 1) % 2
     }
 
     fn note_on(&self, n: &Note, stats: &mut NoteStats) {
-        self.midi_out.message(&[0x90 | self.channel(&stats), n.note, n.velocity]).unwrap();
-        stats.sending_note_on(n.note);
+        let c = self.channel(&stats);
+        self.midi_out.message(&[0x90 | c, n.note, n.velocity]).unwrap();
+        stats.sending_note_on(n.note, c);
         if self.should_record {
             post_cmd_to_recorder(object!{
                 action: "on",
@@ -305,16 +307,17 @@ impl MidiNoteSink for OutputStage {
         }
     
         if self.hold_length == 1 {
-            if n.note == stats.last() {
-                self.note_off(n.note, self.channel(&stats));
+            let l = stats.last();
+            if n.note == l.0 {
+                self.note_off(n.note, l.1);
             } else {
-                self.note_off(stats.last(), self.channel(&stats));
+                self.note_off(l.0, l.1);
                 self.note_on(&n, stats);
             }
             return;
         }
 
-        if n.note == stats.last() {
+        if n.note == stats.last().0 {
             return;
         }
 
