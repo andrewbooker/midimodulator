@@ -68,8 +68,8 @@ impl NoteStats {
         self.received[NOTE_HISTORY - 1]
     }
 
-    fn look_back(&self, b: u8) -> u8 {
-        self.received[NOTE_HISTORY - usize::from(b)].0
+    fn look_back(&self, b: u8) -> PlayedNote {
+        self.received[NOTE_HISTORY - usize::from(b)]
     }
 
     fn sending_note_on(&mut self, n: u8, c: u8) {
@@ -308,10 +308,8 @@ impl MidiNoteSink for OutputStage {
     
         if self.hold_length == 1 {
             let l = stats.last();
-            if n.note == l.0 {
-                self.note_off(n.note, l.1);
-            } else {
-                self.note_off(l.0, l.1);
+            self.note_off(l.0, l.1);
+            if n.note != l.0 {
                 self.note_on(&n, stats);
             }
             return;
@@ -322,8 +320,8 @@ impl MidiNoteSink for OutputStage {
         }
 
         let prev = stats.look_back(self.hold_length);
-        if prev != 0 {
-            self.note_off(prev, self.channel(&stats));
+        if prev.0 != 0 {
+            self.note_off(prev.0, prev.1);
         }
         self.note_on(&n, stats);
     }
@@ -361,7 +359,7 @@ fn configure(route: &Vec<&str>, s: Rc<Scale>, midi_out: Rc<RtMidiOut>) -> Rc<dyn
     let os: Vec<&str> = route.last().unwrap().split("_").collect();
     let hold_length: u8 = os[0].parse().unwrap();
     let should_record = os.len() > 1 && os[1] == "R";
-    let channel_range = if hold_length == 1 { true } else { false };
+    let channel_range = if hold_length < 3 { true } else { false };
     seq.push(Rc::new(OutputStage { midi_out, hold_length, should_record, channel_range }));
 
     for r in route.into_iter().rev() {
@@ -393,7 +391,7 @@ fn midi_input_routing() -> [TonicModeKorgD110; 3] {
             49,
             "aeolian",
             vec!("dropper", "noteMap", "randomOctaveTop", "3"),
-            vec!("notifyingDropper", "noteMap", "randomOctaveBass", "1")
+            vec!("notifyingDropper", "noteMap", "randomOctaveBass", "2")
         ),
         (
             50,
