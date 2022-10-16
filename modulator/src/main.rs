@@ -17,7 +17,8 @@ use crate::d110::{
     init_d110,
     init_timbre,
     set_up_tone,
-    PARTIAL_SPEC
+    PARTIAL_SPEC,
+    D110SysEx
 };
 use crate::korg::{
     KorgProgramSysEx,
@@ -91,30 +92,35 @@ impl StepInterval for FixedEquivalentMillisInterval {
     }
 }
 
+const NUM_D110_PARTS: usize = 2;
 
 fn update_d110(updater: &mut PairedUpdater, d110_midi_out: &mut MidiOut) {
     let mut dummy_1 = DummySelector::new();
     let mut dummy_2 = DummySelector::new();
 
-    let mut t1 = set_up_tone(1);
-    let mut t2 = set_up_tone(2);
+    let tones: [& mut D110SysEx; NUM_D110_PARTS] = [
+        &mut set_up_tone(1),
+        &mut set_up_tone(2)
+    ];
 
-    updater.update(&mut t1, &mut dummy_1, &mut dummy_2, &PARTIAL_SPEC, Some("tone1_partialA_1"));
-    updater.update(&mut t1, &mut dummy_1, &mut dummy_2, &PARTIAL_SPEC, Some("tone1_partialB_3"));
-    updater.update(&mut t1, &mut dummy_1, &mut dummy_2, &PARTIAL_SPEC, Some("tone1_partialC_2"));
-    updater.update(&mut t1, &mut dummy_1, &mut dummy_2, &PARTIAL_SPEC, Some("tone1_partialD_4"));
-
-    updater.update(&mut t2, &mut dummy_1, &mut dummy_2, &PARTIAL_SPEC, Some("tone2_partialA_1"));
-    updater.update(&mut t2, &mut dummy_1, &mut dummy_2, &PARTIAL_SPEC, Some("tone2_partialB_3"));
-    updater.update(&mut t2, &mut dummy_1, &mut dummy_2, &PARTIAL_SPEC, Some("tone2_partialC_2"));
-    updater.update(&mut t2, &mut dummy_1, &mut dummy_2, &PARTIAL_SPEC, Some("tone2_partialD_4"));
+    let prefixes = ["A_1", "B_3", "C_2", "D_4"];
+    for t in 0..NUM_D110_PARTS {
+        for p in prefixes {
+            updater.update(tones[t], &mut dummy_1, &mut dummy_2, &PARTIAL_SPEC, Some(&*format!("tone{}_partial{}", t + 1, p)));
+        }
+    }
 
     updater.sweep_alternator();
+
+    for t in 0..NUM_D110_PARTS {
+        let v = tones[t].to_send();
+        d110_midi_out.send_sys_ex(&v);
+    }
+
+    println!("--");
     for (key, val) in &updater.sweep_state {
         println!("{}: {}", key, val.val);
     }
-    d110_midi_out.send_sys_ex(&t1.to_send());
-    d110_midi_out.send_sys_ex(&t2.to_send());
 }
 
 
@@ -126,8 +132,7 @@ fn modulate_d110(device_number: i32) {
         println!("sending timbre {}", t);
         d110_midi_out.send_sys_ex(&init_timbre(t).to_send());
     }
-    for t in 3..9 {
-        println!("muting tone {}", t);
+    for t in 1..9 {
         d110_midi_out.send_sys_ex(&set_up_tone(t).to_send());
     }
     println!("D110 init sent");
