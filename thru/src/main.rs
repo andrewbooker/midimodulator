@@ -251,7 +251,9 @@ fn find_output_from(substr: &str) -> RtMidiOut {
 
 
 fn send_all_note_off(midi_out: &RtMidiOut) {
-    midi_out.message(&[0xB0, 0x7B, 0]).unwrap();
+    for c in 0..16 {
+        midi_out.message(&[0xB0 | c, 0x7B, 0]).unwrap();
+    }
 }
 
 
@@ -261,12 +263,19 @@ struct OutputStage {
     midi_out: Rc<RtMidiOut>,
     hold_length: u8,
     should_record: bool,
-    channel: u8
+    channel_range: bool
 }
 
 impl OutputStage {
+    fn channel(&self, _: &NoteStats) -> u8 {
+        if !self.channel_range {
+            return 0;
+        }
+        return 1;
+    }
+
     fn note_on(&self, n: &Note, stats: &mut NoteStats) {
-        self.midi_out.message(&[0x90 | self.channel, n.note, n.velocity]).unwrap();
+        self.midi_out.message(&[0x90 | self.channel(&stats), n.note, n.velocity]).unwrap();
         stats.sending_note_on(n.note);
         if self.should_record {
             post_cmd_to_recorder(object!{
@@ -276,8 +285,8 @@ impl OutputStage {
         }
     }
 
-    fn note_off(&self, n: u8) {
-        self.midi_out.message(&[0x80 | self.channel, n, 0]).unwrap();
+    fn note_off(&self, n: u8, channel: u8) {
+        self.midi_out.message(&[0x80 | channel, n, 0]).unwrap();
         if self.should_record {
             post_cmd_to_recorder(object!{
                 action: "off"
@@ -291,15 +300,15 @@ impl MidiNoteSink for OutputStage {
         if self.hold_length == 0 {
             self.note_on(&n, stats);
             thread::sleep(Duration::from_millis(40));
-            self.note_off(n.note);
+            self.note_off(n.note, self.channel(&stats));
             return;
         }
     
         if self.hold_length == 1 {
             if n.note == stats.last() {
-                self.note_off(n.note);
+                self.note_off(n.note, self.channel(&stats));
             } else {
-                self.note_off(stats.last());
+                self.note_off(stats.last(), self.channel(&stats));
                 self.note_on(&n, stats);
             }
             return;
@@ -311,7 +320,7 @@ impl MidiNoteSink for OutputStage {
 
         let prev = stats.look_back(self.hold_length);
         if prev != 0 {
-            self.note_off(prev);
+            self.note_off(prev, self.channel(&stats));
         }
         self.note_on(&n, stats);
     }
@@ -349,8 +358,8 @@ fn configure(route: &Vec<&str>, s: Rc<Scale>, midi_out: Rc<RtMidiOut>) -> Rc<dyn
     let os: Vec<&str> = route.last().unwrap().split("_").collect();
     let hold_length: u8 = os[0].parse().unwrap();
     let should_record = os.len() > 1 && os[1] == "R";
-    let channel = if hold_length == 1 { 1 } else { 0 };
-    seq.push(Rc::new(OutputStage { midi_out, hold_length, should_record, channel }));
+    let channel_range = if hold_length == 1 { true } else { false };
+    seq.push(Rc::new(OutputStage { midi_out, hold_length, should_record, channel_range }));
 
     for r in route.into_iter().rev() {
         let next = Rc::clone(&seq[seq.len() - 1]);
