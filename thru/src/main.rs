@@ -260,12 +260,13 @@ fn send_all_note_off(midi_out: &RtMidiOut) {
 struct OutputStage {
     midi_out: Rc<RtMidiOut>,
     hold_length: u8,
-    should_record: bool
+    should_record: bool,
+    channel: u8
 }
 
 impl OutputStage {
     fn note_on(&self, n: &Note, stats: &mut NoteStats) {
-        self.midi_out.message(&[0x90, n.note, n.velocity]).unwrap();
+        self.midi_out.message(&[0x90 | self.channel, n.note, n.velocity]).unwrap();
         stats.sending_note_on(n.note);
         if self.should_record {
             post_cmd_to_recorder(object!{
@@ -276,7 +277,7 @@ impl OutputStage {
     }
 
     fn note_off(&self, n: u8) {
-        self.midi_out.message(&[0x80, n, 0]).unwrap();
+        self.midi_out.message(&[0x80 | self.channel, n, 0]).unwrap();
         if self.should_record {
             post_cmd_to_recorder(object!{
                 action: "off"
@@ -348,7 +349,8 @@ fn configure(route: &Vec<&str>, s: Rc<Scale>, midi_out: Rc<RtMidiOut>) -> Rc<dyn
     let os: Vec<&str> = route.last().unwrap().split("_").collect();
     let hold_length: u8 = os[0].parse().unwrap();
     let should_record = os.len() > 1 && os[1] == "R";
-    seq.push(Rc::new(OutputStage { midi_out, hold_length, should_record }));
+    let channel = if hold_length == 1 { 1 } else { 0 };
+    seq.push(Rc::new(OutputStage { midi_out, hold_length, should_record, channel }));
 
     for r in route.into_iter().rev() {
         let next = Rc::clone(&seq[seq.len() - 1]);
