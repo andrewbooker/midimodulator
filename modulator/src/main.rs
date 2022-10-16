@@ -92,7 +92,7 @@ impl StepInterval for FixedEquivalentMillisInterval {
     }
 }
 
-const NUM_D110_PARTS: usize = 2;
+const NUM_D110_PARTS: usize = 3;
 
 fn update_d110(updater: &mut PairedUpdater, d110_midi_out: &mut MidiOut) {
     let mut dummy_1 = DummySelector::new();
@@ -100,7 +100,8 @@ fn update_d110(updater: &mut PairedUpdater, d110_midi_out: &mut MidiOut) {
 
     let tones: [& mut D110SysEx; NUM_D110_PARTS] = [
         &mut set_up_tone(1),
-        &mut set_up_tone(2)
+        &mut set_up_tone(2),
+        &mut set_up_tone(3)
     ];
 
     let prefixes = ["A_1", "B_3", "C_2", "D_4"];
@@ -133,6 +134,7 @@ fn modulate_d110(device_number: i32) {
         d110_midi_out.send_sys_ex(&init_timbre(t).to_send());
     }
     for t in 1..9 {
+        println!("intitialising part {}", t);
         d110_midi_out.send_sys_ex(&set_up_tone(t).to_send());
     }
     println!("D110 init sent");

@@ -264,15 +264,15 @@ struct OutputStage {
     midi_out: Rc<RtMidiOut>,
     hold_length: u8,
     should_record: bool,
-    channel_range: bool
+    channel_range: u8
 }
 
 impl OutputStage {
     fn channel(&self, stats: &NoteStats) -> u8 {
-        if !self.channel_range {
+        if self.channel_range == 0 {
             return 0;
         }
-        return (stats.last().1 + 1) % 2
+        return (stats.last().1 + 1) % self.channel_range
     }
 
     fn note_on(&self, n: &Note, stats: &mut NoteStats) {
@@ -359,7 +359,7 @@ fn configure(route: &Vec<&str>, s: Rc<Scale>, midi_out: Rc<RtMidiOut>) -> Rc<dyn
     let os: Vec<&str> = route.last().unwrap().split("_").collect();
     let hold_length: u8 = os[0].parse().unwrap();
     let should_record = os.len() > 1 && os[1] == "R";
-    let channel_range = if hold_length < 3 { true } else { false };
+    let channel_range = if hold_length < 3 { 3 } else { 0 };
     seq.push(Rc::new(OutputStage { midi_out, hold_length, should_record, channel_range }));
 
     for r in route.into_iter().rev() {
