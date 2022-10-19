@@ -38,6 +38,7 @@ use std::{
     net::TcpListener,
     collections::HashMap
 };
+use rand::prelude::SliceRandom;
 
 
 struct DummySelector;
@@ -125,8 +126,10 @@ fn update_d110(updater: &mut PairedUpdater, d110_midi_out: &mut MidiOut) {
 }
 
 
-fn modulate_d110(device_number: i32) {
-    let mut d110_midi_out = MidiOut::using_device(device_number);
+fn recieve_play_notifications(d110_number: i32, spdsx_number: i32) {
+    let mut d110_midi_out = MidiOut::using_device(d110_number);
+    let mut spdsx_midi_out = MidiOut::using_device(spdsx_number);
+
     let d110_init = init_d110();
     d110_midi_out.send_sys_ex(&d110_init.to_send());
     for t in 1..9 {
@@ -163,6 +166,10 @@ fn modulate_d110(device_number: i32) {
         let interval = FixedEquivalentMillisInterval::new(1000 * count);
         let mut updater = PairedUpdater::new(&interval);
         update_d110(&mut updater, &mut d110_midi_out);
+
+        let spdsx_progs: Vec<u8> = (70..82).collect();
+        let prog = *spdsx_progs.choose(&mut rand::thread_rng()).unwrap();
+        spdsx_midi_out.send(&MidiMessage::program(prog, 0xD));
     }
 }
 
@@ -218,10 +225,12 @@ fn modulate_korg<C>(cmd_dump_rx: &Receiver<C>, res_tx: &Sender<HashMap<std::stri
 fn main() {
     let d110_number = MidiOutDevices::index_of("4i4o MIDI 4").unwrap();
     let korg_number = MidiOutDevices::index_of("4i4o MIDI 3").unwrap();
+    let spdsx_number = MidiOutDevices::index_of("4i4o MIDI 1").unwrap();
     println!("D110 port {}", d110_number);
     println!("Korg port {}", korg_number);
+    println!("SPD-SX port {}", spdsx_number);
 
-    thread::spawn(move || { modulate_d110(d110_number); });
+    thread::spawn(move || { recieve_play_notifications(d110_number, spdsx_number); });
 
     let mut midi_out = MidiOut::using_device(korg_number);
     midi_out.send_sys_ex(&KorgInitSysEx::new(0x02).data); // select prog

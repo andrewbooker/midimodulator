@@ -122,7 +122,11 @@ impl Scale {
     }
 
     fn at(&self, idx: u8) -> u8 {
-        self.notes[idx as usize]
+        let i = idx as usize;
+        if self.notes.len() > i {
+            return self.notes[i];
+        }
+        0
     }
 }
 
