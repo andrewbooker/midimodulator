@@ -29,8 +29,8 @@ fn post_cmd_to_recorder(data: JsonValue) {
     post_cmd(9009, data);
 }
 
-fn post_cmd_to_modulator() {
-    post_cmd(7878, object!{});
+fn post_cmd_to_modulator(note: u8) {
+    post_cmd(7878, object!{ note: note });
 }
 
 
@@ -199,11 +199,12 @@ struct NotifyingRandomNoteDropper {
 
 impl MidiNoteSink for NotifyingRandomNoteDropper {
     fn receive(&self, n: &Note, stats: &mut NoteStats) {
+        let note = n.note;
         if RandomNoteDropper::should_play() {
             self.next.receive(n, stats);
         } else {
             thread::spawn(move || {
-                post_cmd_to_modulator();
+                post_cmd_to_modulator(note);
             });
         }
     }
