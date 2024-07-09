@@ -14,7 +14,8 @@ use crate::notesink::{
     NoteMap,
     RandomNoteMap,
     RandomNoteDropper,
-    NotifyingRandomNoteDropper
+    NotifyingRandomNoteDropper,
+    RandomOctaveStage
 };
 
 use crate::interop::{
@@ -30,37 +31,6 @@ use std::time::Duration;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-
-
-// RandomOctaveStage
-
-struct RandomOctaveStage {
-    octave_range: u8,
-    base: i8,
-    next: Rc<dyn MidiNoteSink>
-}
-
-impl RandomOctaveStage {
-    pub fn to(octave_range: u8, base: i8, next: Rc<dyn MidiNoteSink>) -> RandomOctaveStage {
-        RandomOctaveStage {
-            octave_range,
-            base,
-            next
-        }
-    }
-}
-
-impl MidiNoteSink for RandomOctaveStage {
-    fn receive(&self, n: &Note, stats: &mut NoteStats) {
-        let r = rand::random::<f64>();
-        let o = ((r * self.octave_range as f64) as i8) + self.base;
-        let transposed = Note {
-            note: (n.note as i8 + (12 * o)) as u8,
-            velocity: n.velocity
-        };
-        self.next.receive(&transposed, stats);
-    }
-}
 
 
 fn find_output_from(substr: &str) -> RtMidiOut {
