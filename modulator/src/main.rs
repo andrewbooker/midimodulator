@@ -118,18 +118,11 @@ fn update_d110(updater: &mut PairedUpdater, d110_midi_out: &mut MidiOut) {
         let v = tones[t].to_send();
         d110_midi_out.send_sys_ex(&v);
     }
-
-    println!("--");
-    for (key, val) in &updater.sweep_state {
-        println!("{}: {}", key, val.val);
-    }
 }
 
 
-fn recieve_play_notifications(d110_number: i32, spdsx_number: i32) {
+fn receive_play_notifications(d110_number: i32) {
     let mut d110_midi_out = MidiOut::using_device(d110_number);
-    let mut spdsx_midi_out = MidiOut::using_device(spdsx_number);
-
     let d110_init = init_d110();
     d110_midi_out.send_sys_ex(&d110_init.to_send());
     for t in 1..9 {
@@ -166,16 +159,12 @@ fn recieve_play_notifications(d110_number: i32, spdsx_number: i32) {
         let interval = FixedEquivalentMillisInterval::new(1000 * count);
         let mut updater = PairedUpdater::new(&interval);
         update_d110(&mut updater, &mut d110_midi_out);
-
-        let spdsx_progs: Vec<u8> = (70..82).collect();
-        let prog = *spdsx_progs.choose(&mut rand::thread_rng()).unwrap();
-        spdsx_midi_out.send(&MidiMessage::program(prog, 0xD));
     }
 }
 
 
 fn modulate_korg<C>(cmd_dump_rx: &Receiver<C>, res_tx: &Sender<HashMap<std::string::String, SweepState>>, first_tx: &Sender<i32>) {
-    let mut port = serialport::new("/dev/ttyS0", 38400)
+    let mut port = serialport::new("/dev/ttyUSB0", 38400)
                     .timeout(Duration::from_millis(1000))
                     .open()
                     .expect("Failed to open port");
@@ -225,12 +214,10 @@ fn modulate_korg<C>(cmd_dump_rx: &Receiver<C>, res_tx: &Sender<HashMap<std::stri
 fn main() {
     let d110_number = MidiOutDevices::index_of("4i4o MIDI 4").unwrap();
     let korg_number = MidiOutDevices::index_of("4i4o MIDI 3").unwrap();
-    let spdsx_number = MidiOutDevices::index_of("4i4o MIDI 1").unwrap();
     println!("D110 port {}", d110_number);
     println!("Korg port {}", korg_number);
-    println!("SPD-SX port {}", spdsx_number);
 
-    thread::spawn(move || { recieve_play_notifications(d110_number, spdsx_number); });
+    thread::spawn(move || { receive_play_notifications(d110_number); });
 
     let mut midi_out = MidiOut::using_device(korg_number);
     midi_out.send_sys_ex(&KorgInitSysEx::new(0x02).data); // select prog
