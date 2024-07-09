@@ -354,7 +354,6 @@ fn index_of(substr: &str, input: &RtMidiIn) -> u32 {
 
 const KORG_OUT: &str = "4i4o MIDI 3";
 const D110_OUT: &str = "4i4o MIDI 4";
-const MIDI_IN: &str = "4i4o MIDI 4";
 const NUM_PARTS: usize = 2;
 
 
@@ -416,12 +415,7 @@ fn main() -> Result<(), RtMidiError> {
     ]);
 
     let input = RtMidiIn::new(Default::default())?;
-    let input_ports = input.port_count()?;
-    println!("{} MIDI input sources", input_ports);
-    for port in 0..input_ports {
-        println!("Input {}: {}", port + 1, input.port_name(port)?);
-    }
-    let input_port = index_of(MIDI_IN, &input);
+    let input_port = index_of("USB MIDI Interface", &input);
     input.open_port(input_port, "RtMidi Input")?;
 
     let stats: [Mutex<NoteStats>; NUM_PARTS] = [
