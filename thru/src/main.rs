@@ -70,21 +70,20 @@ const NUM_PARTS: usize = 2;
 
 
 
-type TonicModeKorgD110 = (Vec<&'static str>, Vec<&'static str>);
-fn midi_input_routing() -> [TonicModeKorgD110; 3] {
+type Routing = Vec<&'static str>;
+fn routing_korg() -> [Routing; 3] {
     [
-        (
-            vec!("noteMap", "randomOctaveTop", "1_R"),
-            vec!("dropper", "noteMap", "randomOctaveBass", "1")
-        ),
-        (
-            vec!("dropper", "noteMap", "randomOctaveTop", "3"),
-            vec!("notifyingDropper", "noteMap", "randomOctaveBass", "2")
-        ),
-        (
-            vec!("randomNoteMap", "randomOctaveTop", "3"),
-            vec!("randomNoteMap", "randomOctaveTop", "3")
-        )
+        vec!("noteMap", "randomOctaveTop", "1_R"),
+        vec!("dropper", "noteMap", "randomOctaveTop", "3"),
+        vec!("randomNoteMap", "randomOctaveTop", "3")
+    ]
+}
+
+fn routing_d110() -> [Routing; 3] {
+    [
+        vec!("dropper", "noteMap", "randomOctaveBass", "1"),
+        vec!("notifyingDropper", "noteMap", "randomOctaveBass", "2"),
+        vec!("randomNoteMap", "randomOctaveTop", "3")
     ]
 }
 
@@ -114,7 +113,8 @@ fn main() -> Result<(), RtMidiError> {
     let korg_midi_out = Rc::new(find_output_from(KORG_OUT));
     let d110_midi_out = Rc::new(find_output_from(D110_OUT));
 
-    let (korg, d110) = &midi_input_routing()[1];
+    let korg = &routing_korg()[1];
+    let d110 = &routing_d110()[1];
     let scale = Rc::new(Scale::from(tonic, &modes[mode]));
 
     let parts: [Rc<dyn MidiNoteSink>; NUM_PARTS] = [
