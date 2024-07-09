@@ -1,3 +1,9 @@
+mod note;
+
+use crate::note::{
+    Note
+};
+
 use std::sync::mpsc;
 use std::sync::Mutex;
 use std::thread;
@@ -33,20 +39,6 @@ fn post_cmd_to_modulator(note: u8) {
     post_cmd(7878, object!{ note: note });
 }
 
-
-struct Note {
-    note: u8,
-    velocity: u8
-}
-
-impl Note {
-    pub fn from_midi_message(message: &[u8]) -> Note {
-        Note {
-            note: message[1],
-            velocity: message[2]
-        }
-    }
-}
 
 
 const NOTE_HISTORY: usize = 8;
