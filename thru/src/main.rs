@@ -33,6 +33,7 @@ use json::object;
 use std::time::Duration;
 use std::collections::HashMap;
 use std::rc::Rc;
+use std::env;
 
 
 
@@ -69,24 +70,18 @@ const NUM_PARTS: usize = 2;
 
 
 
-type TonicModeKorgD110 = (u8, &'static str, Vec<&'static str>, Vec<&'static str>);
+type TonicModeKorgD110 = (Vec<&'static str>, Vec<&'static str>);
 fn midi_input_routing() -> [TonicModeKorgD110; 3] {
     [
         (
-            48,
-            "lydian",
             vec!("noteMap", "randomOctaveTop", "1_R"),
             vec!("dropper", "noteMap", "randomOctaveBass", "1")
         ),
         (
-            49,
-            "aeolian",
             vec!("dropper", "noteMap", "randomOctaveTop", "3"),
             vec!("notifyingDropper", "noteMap", "randomOctaveBass", "2")
         ),
         (
-            50,
-            "aeolian",
             vec!("randomNoteMap", "randomOctaveTop", "3"),
             vec!("randomNoteMap", "randomOctaveTop", "3")
         )
@@ -101,6 +96,12 @@ fn main() -> Result<(), RtMidiError> {
         ("lydian", [2, 2, 2, 1, 2, 2])
     ]);
 
+    let args: Vec<_> = env::args().collect();
+    let tonic = if args.len() > 1 { args[1].parse::<u8>().unwrap() } else { 60 };
+    let mode = if args.len() > 2 { args[2].as_str() } else { "aeolian" };
+
+    println!("Playing {} {}", tonic, mode);
+
     let input = RtMidiIn::new(Default::default())?;
     let input_port = index_of("USB MIDI Interface", &input);
     input.open_port(input_port, "RtMidi Input")?;
@@ -113,8 +114,8 @@ fn main() -> Result<(), RtMidiError> {
     let korg_midi_out = Rc::new(find_output_from(KORG_OUT));
     let d110_midi_out = Rc::new(find_output_from(D110_OUT));
 
-    let (tonic, mode, korg, d110) = &midi_input_routing()[1];
-    let scale = Rc::new(Scale::from(*tonic, &modes[mode]));
+    let (korg, d110) = &midi_input_routing()[1];
+    let scale = Rc::new(Scale::from(tonic, &modes[mode]));
 
     let parts: [Rc<dyn MidiNoteSink>; NUM_PARTS] = [
         configure(d110, Rc::clone(&scale), Rc::clone(&d110_midi_out)),
