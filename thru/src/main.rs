@@ -457,6 +457,7 @@ fn main() -> Result<(), RtMidiError> {
 
     let (cmd_stop_tx, cmd_stop_rx) = mpsc::channel();
     let (cmd_note_off_tx, cmd_note_off_rx) = mpsc::channel();
+    let (cmd_note_test_tx, cmd_note_test_rx) = mpsc::channel();
     thread::spawn(move || {
         let g = getch::Getch::new();
         loop {
@@ -468,7 +469,10 @@ fn main() -> Result<(), RtMidiError> {
                 },
                 'o' => {
                     cmd_note_off_tx.send(()).unwrap();
-                }
+                },
+                't' => {
+                    cmd_note_test_tx.send(()).unwrap();
+                },
                 _ => {}
             }
         }
@@ -492,8 +496,13 @@ fn main() -> Result<(), RtMidiError> {
             },
             _ => thread::sleep(Duration::from_millis(50))
         }
-
+        match cmd_note_test_rx.try_recv() {
+            Ok(_) => {
+                let c = 0;
+                korg_midi_out.message(&[0x90 | c, 60, 99]).unwrap();
+            },
+            _ => thread::sleep(Duration::from_millis(50))
+        }
     }
-
     Ok(())
 }
