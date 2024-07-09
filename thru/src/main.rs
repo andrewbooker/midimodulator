@@ -1,7 +1,10 @@
 mod note;
 
 use crate::note::{
-    Note
+    Note,
+    NoteStats,
+    Mode,
+    Scale
 };
 
 use std::sync::mpsc;
@@ -41,87 +44,9 @@ fn post_cmd_to_modulator(note: u8) {
 
 
 
-const NOTE_HISTORY: usize = 8;
-type PlayedNote = (u8, u8);
-
-struct NoteStats {
-    received: [PlayedNote; NOTE_HISTORY]
-}
-
-
-impl NoteStats {
-    fn new() -> NoteStats {
-        NoteStats {
-            received: [(0, 0); NOTE_HISTORY]
-        }
-    }
-
-    fn last(&self) -> PlayedNote {
-        self.received[NOTE_HISTORY - 1]
-    }
-
-    fn look_back(&self, b: u8) -> PlayedNote {
-        self.received[NOTE_HISTORY - usize::from(b)]
-    }
-
-    fn sending_note_on(&mut self, n: u8, c: u8) {
-        for i in 1..NOTE_HISTORY {
-            self.received[i - 1] = self.received[i];
-        }
-        self.received[NOTE_HISTORY - 1] = (n, c);
-    }
-}
-
-
-
 trait MidiNoteSink {
     fn receive(&self, note: &Note, stats: &mut NoteStats);
 }
-
-
-
-// Scale
-
-type Mode = [u8; 6];
-const SCALE_LENGTH: usize = 9;
-
-struct Scale {
-    notes: [u8; SCALE_LENGTH]
-}
-
-
-impl Scale {
-    fn from(tonic: u8, mode: &Mode) -> Scale {
-        let mode_len: u8 = mode.len() as u8;
-
-        let mut notes = [0; SCALE_LENGTH];
-        let mut octaves: u8 = 0;
-        let mut base: u8 = tonic;
-
-        for n in 0..SCALE_LENGTH as u8 {
-            if (n % (mode_len + 1)) == 0 {
-                base = tonic + (octaves * 12) as u8;
-                octaves += 1;
-            } else {
-                let idx = (n - octaves) % mode_len;
-                base += mode[idx as usize];
-            }
-            notes[n as usize] = base;
-        }
-        Scale {
-            notes
-        }
-    }
-
-    fn at(&self, idx: u8) -> u8 {
-        let i = idx as usize;
-        if self.notes.len() > i {
-            return self.notes[i];
-        }
-        0
-    }
-}
-
 
 // NoteMap
 
