@@ -1,4 +1,6 @@
 mod note;
+mod notesink;
+mod interop;
 
 use crate::note::{
     Note,
@@ -7,125 +9,27 @@ use crate::note::{
     Scale
 };
 
+use crate::notesink::{
+    MidiNoteSink,
+    NoteMap,
+    RandomNoteMap,
+    RandomNoteDropper,
+    NotifyingRandomNoteDropper
+};
+
+use crate::interop::{
+    post_cmd_to_recorder
+};
+
 use std::sync::mpsc;
 use std::sync::Mutex;
 use std::thread;
 use rtmidi::{RtMidiIn, RtMidiOut, RtMidiError};
-use json::{object, JsonValue};
+use json::object;
 use std::time::Duration;
 use std::collections::HashMap;
-use reqwest::StatusCode;
 use std::rc::Rc;
 
-
-fn post_cmd(port: u16, data: JsonValue) {
-    let client = reqwest::blocking::Client::new();
-    match client.post(format!("http://localhost:{}", port))
-                    .header("Content-type", "application/json")
-                    .body(data.dump())
-                    .send() {
-        Err(e) => println!("{:?}", e),
-        Ok(res) => {
-            if res.status() != StatusCode::OK {
-                println!("{:?} {:?}", data, res.status());
-            }
-        }
-    }
-}
-
-
-fn post_cmd_to_recorder(data: JsonValue) {
-    post_cmd(9009, data);
-}
-
-fn post_cmd_to_modulator(note: u8) {
-    post_cmd(7878, object!{ note: note });
-}
-
-
-
-trait MidiNoteSink {
-    fn receive(&self, note: &Note, stats: &mut NoteStats);
-}
-
-// NoteMap
-
-struct NoteMap {
-    next: Rc<dyn MidiNoteSink>,
-    scale: Rc<Scale>
-}
-
-impl MidiNoteSink for NoteMap {
-    fn receive(&self, n: &Note, stats: &mut NoteStats) {
-        let transposed = Note {
-            note: self.scale.at(n.note),
-            velocity: n.velocity
-        };
-
-        self.next.receive(&transposed, stats);
-    }
-}
-
-
-// RandomNoteMap
-
-struct RandomNoteMap {
-    next: Rc<dyn MidiNoteSink>,
-    scale: Rc<Scale>
-}
-
-impl MidiNoteSink for RandomNoteMap {
-    fn receive(&self, n: &Note, stats: &mut NoteStats) {
-        let r = rand::random::<f64>() * 8.0;
-        let randomised = Note {
-            note: self.scale.at(r.round() as u8),
-            velocity: n.velocity
-        };
-
-        self.next.receive(&randomised, stats);
-    }
-}
-
-
-// RandomNoteDropper
-
-struct RandomNoteDropper {
-    next: Rc<dyn MidiNoteSink>
-}
-
-impl RandomNoteDropper {
-    fn should_play() -> bool {
-        rand::random::<f64>() > 0.7
-    }
-}
-
-impl MidiNoteSink for RandomNoteDropper {
-    fn receive(&self, n: &Note, stats: &mut NoteStats) {
-        if Self::should_play() {
-            self.next.receive(n, stats);
-        }
-    }
-}
-
-
-// NotifyingRandomNoteDropper
-
-struct NotifyingRandomNoteDropper {
-    next: Rc<dyn MidiNoteSink>
-}
-
-impl MidiNoteSink for NotifyingRandomNoteDropper {
-    fn receive(&self, n: &Note, stats: &mut NoteStats) {
-        let note = n.note;
-        if RandomNoteDropper::should_play() {
-            self.next.receive(n, stats);
-        } else {
-            thread::spawn(move || {
-                post_cmd_to_modulator(note);
-            });
-        }
-    }
-}
 
 
 // RandomOctaveStage
