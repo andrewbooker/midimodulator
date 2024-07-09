@@ -20,7 +20,8 @@ use crate::interop::{
 };
 
 use crate::outputstage::{
-    send_all_note_off
+    send_all_note_off,
+    OutputStage
 };
 
 use crate::configure::configure;
@@ -73,17 +74,17 @@ const NUM_PARTS: usize = 2;
 type Routing = Vec<&'static str>;
 fn routing_korg() -> [Routing; 3] {
     [
-        vec!("noteMap", "randomOctaveTop", "1_R"),
-        vec!("dropper", "noteMap", "randomOctaveTop", "3"),
-        vec!("randomNoteMap", "randomOctaveTop", "3")
+        vec!("noteMap", "randomOctaveTop"),
+        vec!("dropper", "noteMap", "randomOctaveTop"),
+        vec!("randomNoteMap", "randomOctaveTop")
     ]
 }
 
 fn routing_d110() -> [Routing; 3] {
     [
-        vec!("dropper", "noteMap", "randomOctaveBass", "1"),
-        vec!("notifyingDropper", "noteMap", "randomOctaveBass", "2"),
-        vec!("randomNoteMap", "randomOctaveTop", "3")
+        vec!("dropper", "noteMap", "randomOctaveBass"),
+        vec!("notifyingDropper", "noteMap", "randomOctaveBass"),
+        vec!("notifyingDropper", "randomNoteMap", "randomOctaveTop")
     ]
 }
 
@@ -113,13 +114,16 @@ fn main() -> Result<(), RtMidiError> {
     let korg_midi_out = Rc::new(find_output_from(KORG_OUT));
     let d110_midi_out = Rc::new(find_output_from(D110_OUT));
 
-    let korg = &routing_korg()[1];
-    let d110 = &routing_d110()[1];
+    let korg = &routing_korg()[2];
+    let d110 = &routing_d110()[2];
     let scale = Rc::new(Scale::from(tonic, &modes[mode]));
 
+    let d110_output_stage = Rc::new(OutputStage { midi_out: Rc::clone(&d110_midi_out), hold_length: 1, should_record: false, channel_range: 3 });
+    let korg_output_stage = Rc::new(OutputStage { midi_out: Rc::clone(&korg_midi_out), hold_length: 0, should_record: false, channel_range: 0 });
+
     let parts: [Rc<dyn MidiNoteSink>; NUM_PARTS] = [
-        configure(d110, Rc::clone(&scale), Rc::clone(&d110_midi_out)),
-        configure(korg, Rc::clone(&scale), Rc::clone(&korg_midi_out))
+        configure(d110, Rc::clone(&scale), Rc::clone(&d110_output_stage)),
+        configure(korg, Rc::clone(&scale), Rc::clone(&korg_output_stage))
     ];
 
     input.set_callback(|_timestamp, message| {
