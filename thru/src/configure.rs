@@ -27,7 +27,7 @@ pub fn configure(route: &Vec<&str>, s: Rc<Scale>, out: Rc<OutputStage>) -> Rc<dy
         let scale = Rc::clone(&s);
         match &r[..] {
             "randomOctaveTop" => seq.push(Rc::new(RandomOctaveStage::to(3, 0, next))),
-            "randomOctaveBass" => seq.push(Rc::new(RandomOctaveStage::to(2, -1, next))),
+            "randomOctaveBass" => seq.push(Rc::new(RandomOctaveStage::to(0, -2, next))),
             "noteMap" => seq.push(Rc::new(NoteMap { next, scale })),
             "randomNoteMap" => seq.push(Rc::new(RandomNoteMap { next, scale })),
             "dropper" => seq.push(Rc::new(RandomNoteDropper { next })),
