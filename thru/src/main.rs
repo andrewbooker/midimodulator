@@ -118,7 +118,7 @@ fn main() -> Result<(), RtMidiError> {
     let d110 = &routing_d110()[2];
     let scale = Rc::new(Scale::from(tonic, &modes[mode]));
 
-    let d110_output_stage = Rc::new(OutputStage { midi_out: Rc::clone(&d110_midi_out), hold_length: 1, should_record: false, channel_range: 3 });
+    let d110_output_stage = Rc::new(OutputStage { midi_out: Rc::clone(&d110_midi_out), hold_length: 1, should_record: false, channel_range: 0 });
     let korg_output_stage = Rc::new(OutputStage { midi_out: Rc::clone(&korg_midi_out), hold_length: 0, should_record: false, channel_range: 0 });
 
     let parts: [Rc<dyn MidiNoteSink>; NUM_PARTS] = [
@@ -186,6 +186,7 @@ fn main() -> Result<(), RtMidiError> {
             Ok(_) => {
                 let c = 0;
                 korg_midi_out.message(&[0x90 | c, 60, 99]).unwrap();
+                d110_midi_out.message(&[0x90 | c, 60, 99]).unwrap();
             },
             _ => thread::sleep(Duration::from_millis(50))
         }
