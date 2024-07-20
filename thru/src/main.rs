@@ -121,7 +121,7 @@ fn main() -> Result<(), RtMidiError> {
     let d110 = &routing_d110()[2];
     let scale = Rc::new(Scale::from(tonic, &modes[mode]));
 
-    let selector = Arc::new(RwLock::new(NoteSelector::new(b'r', Rc::clone(&scale))));
+    let selector = Arc::new(RwLock::new(NoteSelector::new(Rc::clone(&scale))));
 
     let d110_output_stage = Rc::new(OutputStage { midi_out: Arc::clone(&d110_midi_out), hold_length: 1, should_record: false, channel_range: 0 });
     let korg_output_stage = Rc::new(OutputStage { midi_out: Arc::clone(&korg_midi_out), hold_length: 0, should_record: false, channel_range: 0 });

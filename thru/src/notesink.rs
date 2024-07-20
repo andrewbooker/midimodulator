@@ -45,8 +45,8 @@ pub struct NoteSelector {
 }
 
 impl NoteSelector { // possibly split out a trait for the mutabiity bit as it is only required in the main function and nowhere in here
-    pub fn new(strategy: u8, scale: Rc<Scale>) -> NoteSelector {
-        NoteSelector { strategy, scale }
+    pub fn new(scale: Rc<Scale>) -> Self {
+        Self { strategy: b'c', scale }
     }
 
     fn next(&self, stats: &NoteStats) -> u8 {
@@ -77,8 +77,8 @@ pub struct RandomNoteMap {
 }
 
 impl RandomNoteMap {
-    pub fn create_from(next: Rc<dyn MidiNoteSink>, selector: Arc<RwLock<NoteSelector>>) -> RandomNoteMap {
-        RandomNoteMap { next, selector }
+    pub fn create_from(next: Rc<dyn MidiNoteSink>, selector: Arc<RwLock<NoteSelector>>) -> Self {
+        Self { next, selector }
     }
 }
 
@@ -145,8 +145,8 @@ pub struct RandomOctaveStage {
 }
 
 impl RandomOctaveStage {
-    pub fn to(octave_range: u8, base: i8, next: Rc<dyn MidiNoteSink>) -> RandomOctaveStage {
-        RandomOctaveStage {
+    pub fn to(octave_range: u8, base: i8, next: Rc<dyn MidiNoteSink>) -> Self {
+        Self {
             octave_range,
             base,
             next
