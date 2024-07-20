@@ -12,7 +12,8 @@ use crate::note::{
 };
 
 use crate::notesink::{
-    MidiNoteSink
+    MidiNoteSink,
+    NoteSelector
 };
 
 use crate::interop::{
@@ -28,6 +29,8 @@ use crate::configure::configure;
 
 use std::sync::mpsc;
 use std::sync::Mutex;
+use std::sync::Arc;
+
 use std::thread;
 use rtmidi::{RtMidiIn, RtMidiOut, RtMidiError};
 use json::object;
@@ -54,7 +57,10 @@ fn find_output_from(substr: &str) -> RtMidiOut {
 
 
 fn index_of(substr: &str, input: &RtMidiIn) -> u32 {
+    println!("{} MIDI input ports", input.port_count().unwrap());
+    println!("finding {}", substr);
     for port in 0..input.port_count().unwrap() {
+        println!("trying {}", port);
         let name = input.port_name(port).unwrap();
         if name.to_lowercase().contains(&substr.to_lowercase()) {
             println!("found input port {} for {}", port, substr);
@@ -84,7 +90,7 @@ fn routing_d110() -> [Routing; 3] {
     [
         vec!("dropper", "noteMap", "randomOctaveBass"),
         vec!("notifyingDropper", "noteMap", "randomOctaveBass"),
-        vec!("notifyingDropper", "randomNoteMap", "randomOctaveTop")
+        vec!("notifyingDropper", "randomNoteMap", "randomOctaveMid")
     ]
 }
 
@@ -118,12 +124,14 @@ fn main() -> Result<(), RtMidiError> {
     let d110 = &routing_d110()[2];
     let scale = Rc::new(Scale::from(tonic, &modes[mode]));
 
+    let selector = Arc::new(Mutex::new(NoteSelector::new(b'r', Rc::clone(&scale))));
+
     let d110_output_stage = Rc::new(OutputStage { midi_out: Rc::clone(&d110_midi_out), hold_length: 1, should_record: false, channel_range: 0 });
     let korg_output_stage = Rc::new(OutputStage { midi_out: Rc::clone(&korg_midi_out), hold_length: 0, should_record: false, channel_range: 0 });
 
     let parts: [Rc<dyn MidiNoteSink>; NUM_PARTS] = [
-        configure(d110, Rc::clone(&scale), Rc::clone(&d110_output_stage)),
-        configure(korg, Rc::clone(&scale), Rc::clone(&korg_output_stage))
+        configure(d110, Rc::clone(&scale), Arc::clone(&selector), Rc::clone(&d110_output_stage)),
+        configure(korg, Rc::clone(&scale), Arc::clone(&selector), Rc::clone(&korg_output_stage))
     ];
 
     input.set_callback(|_timestamp, message| {
@@ -144,6 +152,7 @@ fn main() -> Result<(), RtMidiError> {
     let (cmd_stop_tx, cmd_stop_rx) = mpsc::channel();
     let (cmd_note_off_tx, cmd_note_off_rx) = mpsc::channel();
     let (cmd_note_test_tx, cmd_note_test_rx) = mpsc::channel();
+    let (cmd_note_tx, cmd_note_rx) = mpsc::channel();
     thread::spawn(move || {
         let g = getch::Getch::new();
         loop {
@@ -158,6 +167,9 @@ fn main() -> Result<(), RtMidiError> {
                 },
                 't' => {
                     cmd_note_test_tx.send(()).unwrap();
+                },
+                'r' | 'c' => {
+                    cmd_note_tx.send(c).unwrap();
                 },
                 _ => {}
             }
@@ -187,6 +199,13 @@ fn main() -> Result<(), RtMidiError> {
                 let c = 0;
                 korg_midi_out.message(&[0x90 | c, 60, 99]).unwrap();
                 d110_midi_out.message(&[0x90 | c, 60, 99]).unwrap();
+            },
+            _ => thread::sleep(Duration::from_millis(50))
+        }
+        match cmd_note_rx.try_recv() {
+            Ok(n) => {
+                let mut sel = selector.lock().unwrap();
+                sel.set_strategy_from(n);
             },
             _ => thread::sleep(Duration::from_millis(50))
         }

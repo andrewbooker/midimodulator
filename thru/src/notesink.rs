@@ -10,6 +10,7 @@ use crate::interop::{
 };
 
 use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 use std::thread;
 
 pub trait MidiNoteSink {
@@ -36,22 +37,59 @@ impl MidiNoteSink for NoteMap {
 }
 
 
+// NoteSelector
+
+pub struct NoteSelector {
+    strategy: u8,
+    scale: Rc<Scale>
+}
+
+impl NoteSelector { // possibly split out a trait for the mutabiity bit as it is only required in the main function and nowhere in here
+    pub fn new(strategy: u8, scale: Rc<Scale>) -> NoteSelector {
+        NoteSelector { strategy, scale }
+    }
+
+    fn next(&self, stats: &NoteStats) -> u8 {
+        match self.strategy as char {
+            'r' => {
+                let r = rand::random::<f64>() * 8.0;
+                self.scale.at(r.round() as u8)
+            },
+            _ => self.scale.notes[0]
+        }
+    }
+
+    pub fn set_strategy_from(&mut self, s: u8) {
+        self.strategy = s;
+        match self.strategy as char {
+            'r' => println!("Playing random note"),
+            _ => println!("Playing tonic")
+        }
+    }
+}
+
+
 // RandomNoteMap
 
 pub struct RandomNoteMap {
     pub next: Rc<dyn MidiNoteSink>,
-    pub scale: Rc<Scale>
+    selector: Arc<Mutex<NoteSelector>>
+}
+
+impl RandomNoteMap {
+    pub fn create_from(next: Rc<dyn MidiNoteSink>, selector: Arc<Mutex<NoteSelector>>) -> RandomNoteMap {
+        RandomNoteMap { next, selector }
+    }
 }
 
 impl MidiNoteSink for RandomNoteMap {
     fn receive(&self, n: &Note, stats: &mut NoteStats) {
-        let r = rand::random::<f64>() * 8.0;
-        let randomised = Note {
-            note: self.scale.at(r.round() as u8),
+        let next = Note {
+            note: self.selector.lock().unwrap().next(&stats),
             velocity: n.velocity
         };
 
-        self.next.receive(&randomised, stats);
+        self.next.receive(&next, stats);
     }
 }
 

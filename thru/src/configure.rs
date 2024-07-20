@@ -8,7 +8,8 @@ use crate::notesink::{
     NoteMap,
     RandomNoteMap,
     RandomNoteDropper,
-    NotifyingRandomNoteDropper
+    NotifyingRandomNoteDropper,
+    NoteSelector
 };
 
 use crate::outputstage::{
@@ -16,9 +17,10 @@ use crate::outputstage::{
 };
 
 use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 
 
-pub fn configure(route: &Vec<&str>, s: Rc<Scale>, out: Rc<OutputStage>) -> Rc<dyn MidiNoteSink> {
+pub fn configure(route: &Vec<&str>, s: Rc<Scale>, sel: Arc<Mutex<NoteSelector>>, out: Rc<OutputStage>) -> Rc<dyn MidiNoteSink> {
     let mut seq = Vec::<Rc<dyn MidiNoteSink>>::new();
     seq.push(out);
 
@@ -27,9 +29,10 @@ pub fn configure(route: &Vec<&str>, s: Rc<Scale>, out: Rc<OutputStage>) -> Rc<dy
         let scale = Rc::clone(&s);
         match &r[..] {
             "randomOctaveTop" => seq.push(Rc::new(RandomOctaveStage::to(3, 0, next))),
+            "randomOctaveMid" => seq.push(Rc::new(RandomOctaveStage::to(2, -1, next))),
             "randomOctaveBass" => seq.push(Rc::new(RandomOctaveStage::to(0, -2, next))),
             "noteMap" => seq.push(Rc::new(NoteMap { next, scale })),
-            "randomNoteMap" => seq.push(Rc::new(RandomNoteMap { next, scale })),
+            "randomNoteMap" => seq.push(Rc::new(RandomNoteMap::create_from(next, Arc::clone(&sel)))),
             "dropper" => seq.push(Rc::new(RandomNoteDropper { next })),
             "notifyingDropper" => seq.push(Rc::new(NotifyingRandomNoteDropper { next })),
             _ => {}
