@@ -13,6 +13,7 @@ use std::rc::Rc;
 use std::sync::{Arc, RwLock};
 use std::thread;
 
+
 pub trait MidiNoteSink {
     fn receive(&self, note: &Note, stats: &mut NoteStats);
 }
@@ -112,7 +113,7 @@ pub struct RandomNoteDropper {
 
 impl RandomNoteDropper {
     pub fn should_play() -> bool {
-        rand::random::<f64>() > 0.7
+        rand::random::<f64>() > 0.4
     }
 }
 
@@ -135,12 +136,14 @@ pub struct NotifyingRandomNoteDropper {
 impl MidiNoteSink for NotifyingRandomNoteDropper {
     fn receive(&self, n: &Note, stats: &mut NoteStats) {
         let note = n.note;
-        if RandomNoteDropper::should_play() {
+        let millis_since_last_dropped = stats.last_dropped.2.elapsed().as_millis();
+        if RandomNoteDropper::should_play() && millis_since_last_dropped > 500u128 {
             self.next.receive(n, stats);
         } else {
             thread::spawn(move || {
                 post_cmd_to_modulator(note);
             });
+            stats.drop(note);
         }
     }
 }

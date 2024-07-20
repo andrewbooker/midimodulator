@@ -1,3 +1,4 @@
+use std::time::Instant;
 
 pub struct Note {
     pub note: u8,
@@ -14,16 +15,18 @@ impl Note {
 }
 
 pub const NOTE_HISTORY: usize = 8;
-pub type PlayedNote = (u8, u8);
+pub type PlayedNote = (u8, u8, Instant);
 
 pub struct NoteStats {
-    pub received: [PlayedNote; NOTE_HISTORY]
+    pub received: [PlayedNote; NOTE_HISTORY],
+    pub last_dropped: PlayedNote
 }
 
 impl NoteStats {
-    pub fn new() -> NoteStats {
-        NoteStats {
-            received: [(0, 0); NOTE_HISTORY]
+    pub fn new() -> Self {
+        Self {
+            received: [(0, 0, Instant::now()); NOTE_HISTORY],
+            last_dropped: (0, 0, Instant::now())
         }
     }
 
@@ -39,7 +42,11 @@ impl NoteStats {
         for i in 1..NOTE_HISTORY {
             self.received[i - 1] = self.received[i];
         }
-        self.received[NOTE_HISTORY - 1] = (n, c);
+        self.received[NOTE_HISTORY - 1] = (n, c, Instant::now());
+    }
+
+    pub fn drop(&mut self, n: u8) {
+        self.last_dropped = (n, self.last().1, Instant::now());
     }
 }
 
