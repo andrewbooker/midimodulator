@@ -11,7 +11,8 @@ use crate::interop::{
     post_cmd_to_recorder
 };
 
-use std::rc::Rc;
+
+use std::sync::Arc;
 use rtmidi::RtMidiOut;
 use json::object;
 use std::thread;
@@ -28,7 +29,7 @@ pub fn send_all_note_off(midi_out: &RtMidiOut) {
 // OutputStage
 
 pub struct OutputStage {
-    pub midi_out: Rc<RtMidiOut>,
+    pub midi_out: Arc<RtMidiOut>,
     pub hold_length: u8,
     pub should_record: bool,
     pub channel_range: u8

@@ -117,8 +117,8 @@ fn main() -> Result<(), RtMidiError> {
         Mutex::new(NoteStats::new())
     ];
 
-    let korg_midi_out = Rc::new(find_output_from(KORG_OUT));
-    let d110_midi_out = Rc::new(find_output_from(D110_OUT));
+    let korg_midi_out = Arc::new(find_output_from(KORG_OUT));
+    let d110_midi_out = Arc::new(find_output_from(D110_OUT));
 
     let korg = &routing_korg()[2];
     let d110 = &routing_d110()[2];
@@ -126,8 +126,8 @@ fn main() -> Result<(), RtMidiError> {
 
     let selector = Arc::new(Mutex::new(NoteSelector::new(b'r', Rc::clone(&scale))));
 
-    let d110_output_stage = Rc::new(OutputStage { midi_out: Rc::clone(&d110_midi_out), hold_length: 1, should_record: false, channel_range: 0 });
-    let korg_output_stage = Rc::new(OutputStage { midi_out: Rc::clone(&korg_midi_out), hold_length: 0, should_record: false, channel_range: 0 });
+    let d110_output_stage = Rc::new(OutputStage { midi_out: Arc::clone(&d110_midi_out), hold_length: 1, should_record: false, channel_range: 0 });
+    let korg_output_stage = Rc::new(OutputStage { midi_out: Arc::clone(&korg_midi_out), hold_length: 0, should_record: false, channel_range: 0 });
 
     let parts: [Rc<dyn MidiNoteSink>; NUM_PARTS] = [
         configure(d110, Rc::clone(&scale), Arc::clone(&selector), Rc::clone(&d110_output_stage)),
