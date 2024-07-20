@@ -27,10 +27,7 @@ use crate::outputstage::{
 
 use crate::configure::configure;
 
-use std::sync::mpsc;
-use std::sync::Mutex;
-use std::sync::Arc;
-
+use std::sync::{Arc, mpsc, Mutex, RwLock};
 use std::thread;
 use rtmidi::{RtMidiIn, RtMidiOut, RtMidiError};
 use json::object;
@@ -124,7 +121,7 @@ fn main() -> Result<(), RtMidiError> {
     let d110 = &routing_d110()[2];
     let scale = Rc::new(Scale::from(tonic, &modes[mode]));
 
-    let selector = Arc::new(Mutex::new(NoteSelector::new(b'r', Rc::clone(&scale))));
+    let selector = Arc::new(RwLock::new(NoteSelector::new(b'r', Rc::clone(&scale))));
 
     let d110_output_stage = Rc::new(OutputStage { midi_out: Arc::clone(&d110_midi_out), hold_length: 1, should_record: false, channel_range: 0 });
     let korg_output_stage = Rc::new(OutputStage { midi_out: Arc::clone(&korg_midi_out), hold_length: 0, should_record: false, channel_range: 0 });
@@ -137,7 +134,6 @@ fn main() -> Result<(), RtMidiError> {
     input.set_callback(|_timestamp, message| {
         if message[0] == 0x90 && message[2] != 0 {
             let n = Note::from_midi_message(&message);
-
             for i in 0..NUM_PARTS {
                 let mut st = stats[i].lock().unwrap();
                 parts[i].receive(&n, &mut st);
@@ -204,7 +200,7 @@ fn main() -> Result<(), RtMidiError> {
         }
         match cmd_note_rx.try_recv() {
             Ok(n) => {
-                let mut sel = selector.lock().unwrap();
+                let mut sel = selector.write().unwrap();
                 sel.set_strategy_from(n);
             },
             _ => thread::sleep(Duration::from_millis(50))

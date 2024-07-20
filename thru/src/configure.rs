@@ -17,10 +17,10 @@ use crate::outputstage::{
 };
 
 use std::rc::Rc;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, RwLock};
 
 
-pub fn configure(route: &Vec<&str>, s: Rc<Scale>, sel: Arc<Mutex<NoteSelector>>, out: Rc<OutputStage>) -> Rc<dyn MidiNoteSink> {
+pub fn configure(route: &Vec<&str>, s: Rc<Scale>, sel: Arc<RwLock<NoteSelector>>, out: Rc<OutputStage>) -> Rc<dyn MidiNoteSink> {
     let mut seq = Vec::<Rc<dyn MidiNoteSink>>::new();
     seq.push(out);
 

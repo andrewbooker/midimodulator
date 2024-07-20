@@ -10,7 +10,7 @@ use crate::interop::{
 };
 
 use std::rc::Rc;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, RwLock};
 use std::thread;
 
 pub trait MidiNoteSink {
@@ -73,11 +73,11 @@ impl NoteSelector { // possibly split out a trait for the mutabiity bit as it is
 
 pub struct RandomNoteMap {
     pub next: Rc<dyn MidiNoteSink>,
-    selector: Arc<Mutex<NoteSelector>>
+    selector: Arc<RwLock<NoteSelector>>
 }
 
 impl RandomNoteMap {
-    pub fn create_from(next: Rc<dyn MidiNoteSink>, selector: Arc<Mutex<NoteSelector>>) -> RandomNoteMap {
+    pub fn create_from(next: Rc<dyn MidiNoteSink>, selector: Arc<RwLock<NoteSelector>>) -> RandomNoteMap {
         RandomNoteMap { next, selector }
     }
 }
@@ -85,7 +85,7 @@ impl RandomNoteMap {
 impl MidiNoteSink for RandomNoteMap {
     fn receive(&self, n: &Note, stats: &mut NoteStats) {
         let next = Note {
-            note: self.selector.lock().unwrap().next(&stats),
+            note: self.selector.read().unwrap().next(&stats),
             velocity: n.velocity
         };
 
