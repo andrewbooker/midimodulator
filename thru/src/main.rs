@@ -164,7 +164,7 @@ fn main() -> Result<(), RtMidiError> {
                 't' => {
                     cmd_note_test_tx.send(()).unwrap();
                 },
-                'r' | 'c' => {
+                'l' | 'r' | 'c' => {
                     cmd_note_tx.send(c).unwrap();
                 },
                 _ => {}

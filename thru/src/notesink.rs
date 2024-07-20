@@ -51,6 +51,15 @@ impl NoteSelector { // possibly split out a trait for the mutabiity bit as it is
 
     fn next(&self, stats: &NoteStats) -> u8 {
         match self.strategy as char {
+            'l' => {
+                let mut last_note = stats.last().0;
+                if last_note > (self.scale.notes[0] + 12) {
+                    last_note -= 24;
+                } else if last_note < (self.scale.notes[0] - 12) {
+                    last_note += 24;
+                }
+                last_note
+            },
             'r' => {
                 let r = rand::random::<f64>() * 8.0;
                 self.scale.at(r.round() as u8)
@@ -62,6 +71,7 @@ impl NoteSelector { // possibly split out a trait for the mutabiity bit as it is
     pub fn set_strategy_from(&mut self, s: u8) {
         self.strategy = s;
         match self.strategy as char {
+            'l' => println!("Playing last note"),
             'r' => println!("Playing random note"),
             _ => println!("Playing tonic")
         }
