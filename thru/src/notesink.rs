@@ -65,8 +65,12 @@ impl NoteSelector { // possibly split out a trait for the mutabiity bit as it is
                 let r = rand::random::<f64>() * 8.0;
                 self.scale.at(r.round() as u8)
             },
-            'c' => {
-                self.scale.at(1 + self.scale.ordinal_of(stats.last().0))
+            'u' => {
+                self.scale.at(self.scale.ordinal_of(stats.last().0) + 1)
+            },
+            'd' => {
+                let last_ordinal = self.scale.ordinal_of(stats.last().0);
+                self.scale.at(if last_ordinal == 0 { 7 } else { last_ordinal - 1})
             },
             _ => self.scale.notes[0]
         }
@@ -77,7 +81,8 @@ impl NoteSelector { // possibly split out a trait for the mutabiity bit as it is
         match self.strategy as char {
             'l' => println!("Playing last note"),
             'r' => println!("Playing random note"),
-            'c' => println!("Cycling up scale"),
+            'u' => println!("Cycling up scale"),
+            'd' => println!("Cycling down scale"),
             _ => println!("Playing tonic")
         }
     }

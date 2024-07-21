@@ -141,10 +141,10 @@ fn main() -> Result<(), RtMidiError> {
                 'o' => {
                     cmd_note_off_tx.send(()).unwrap();
                 },
-                'd' => {
+                'n' => {
                     cmd_note_test_tx.send(()).unwrap();
                 },
-                't' | 'l' | 'r' | 'c' => {
+                'c' | 't' | 'l' | 'r' | 'u' | 'd' => {
                     cmd_note_tx.send(c).unwrap();
                 },
                 _ => {}
