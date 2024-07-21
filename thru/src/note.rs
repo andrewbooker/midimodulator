@@ -90,6 +90,20 @@ impl Scale {
         }
         return self.at(idx + 1 - len) + 12;
     }
+
+    pub fn ordinal_of(&self, note: u8) -> u8 {
+        let found = self.notes.iter().position(|&n| n == note);
+        if found.is_some() {
+            return found.unwrap() as u8;
+        }
+        if note < self.at(0) {
+            return self.ordinal_of(note + 12);
+        }
+        if note > self.at(7) {
+            return self.ordinal_of(note - 12);
+        }
+        std::panic::panic_any("Note not in scale");
+    }
 }
 
 
@@ -114,5 +128,20 @@ mod tests_scale {
         assert_eq!(scale.at(8), 74);
         assert_eq!(scale.at(9), 76);
         assert_eq!(scale.at(10), 77);
+    }
+
+    #[test]
+    fn can_calculate_base_ordinal_from_note_within_scale() {
+        let scale = Scale::from(60, &[2, 2, 1, 2, 2, 2]);
+
+        assert_eq!(scale.at(0), 60);
+        assert_eq!(scale.ordinal_of(60), 0);
+        assert_eq!(scale.ordinal_of(62), 1);
+        assert_eq!(scale.ordinal_of(72), 7);
+        assert_eq!(scale.ordinal_of(74), 1);
+        assert_eq!(scale.ordinal_of(76), 2);
+        assert_eq!(scale.ordinal_of(88), 2);
+        assert_eq!(scale.ordinal_of(59), 6);
+        assert_eq!(scale.ordinal_of(47), 6);
     }
 }
