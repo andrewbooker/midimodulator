@@ -108,7 +108,27 @@ impl Scale {
 
 
 #[cfg(test)]
-mod tests_scale {
+mod test_stats {
+    use super::NoteStats;
+
+    #[test]
+    fn last_note_is_zero_if_no_note_yet_played() {
+        assert_eq!(NoteStats::new().last().0, 0);
+    }
+
+    #[test]
+    fn records_last_note_on_received() {
+        let mut stats = NoteStats::new();
+
+        stats.sending_note_on(1, 0);
+
+        assert_eq!(stats.last().0, 1);
+    }
+}
+
+
+#[cfg(test)]
+mod test_scale {
     use super::Scale;
 
     #[test]
