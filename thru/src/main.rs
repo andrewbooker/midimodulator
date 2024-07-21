@@ -73,27 +73,7 @@ const D110_OUT: &str = "4i4o MIDI 4";
 const NUM_PARTS: usize = 2;
 
 
-
-type Routing = Vec<&'static str>;
-fn routing_korg() -> [Routing; 3] {
-    [
-        vec!("noteMap", "randomOctaveTop"),
-        vec!("dropper", "noteMap", "randomOctaveTop"),
-        vec!("randomNoteMap", "randomOctaveTop")
-    ]
-}
-
-fn routing_d110() -> [Routing; 3] {
-    [
-        vec!("dropper", "noteMap", "randomOctaveBass"),
-        vec!("notifyingDropper", "noteMap", "randomOctaveBass"),
-        vec!("notifyingDropper", "randomNoteMap", "randomOctaveMid")
-    ]
-}
-
-
 fn main() -> Result<(), RtMidiError> {
-
     let modes: HashMap<&str, Mode> = HashMap::from([
         ("aeolian", [2, 1, 2, 2, 1, 2]),
         ("lydian", [2, 2, 2, 1, 2, 2])
@@ -117,18 +97,18 @@ fn main() -> Result<(), RtMidiError> {
     let korg_midi_out = Arc::new(find_output_from(KORG_OUT));
     let d110_midi_out = Arc::new(find_output_from(D110_OUT));
 
-    let korg = &routing_korg()[2];
-    let d110 = &routing_d110()[2];
-    let scale = Rc::new(Scale::from(tonic, &modes[mode]));
+    let korg = vec!("randomNoteMap", "randomOctaveTop");
+    let d110 = vec!("notifyingDropper", "randomNoteMap", "randomOctaveMid");
 
+    let scale = Rc::new(Scale::from(tonic, &modes[mode]));
     let selector = Arc::new(RwLock::new(NoteSelector::new(Rc::clone(&scale))));
 
     let d110_output_stage = Rc::new(OutputStage { midi_out: Arc::clone(&d110_midi_out), hold_length: 1, should_record: false, channel_range: 0 });
     let korg_output_stage = Rc::new(OutputStage { midi_out: Arc::clone(&korg_midi_out), hold_length: 0, should_record: false, channel_range: 0 });
 
     let parts: [Rc<dyn MidiNoteSink>; NUM_PARTS] = [
-        configure(d110, Rc::clone(&scale), Arc::clone(&selector), Rc::clone(&d110_output_stage)),
-        configure(korg, Rc::clone(&scale), Arc::clone(&selector), Rc::clone(&korg_output_stage))
+        configure(&d110, Rc::clone(&scale), Arc::clone(&selector), Rc::clone(&d110_output_stage)),
+        configure(&korg, Rc::clone(&scale), Arc::clone(&selector), Rc::clone(&korg_output_stage))
     ];
 
     input.set_callback(|_timestamp, message| {
@@ -161,10 +141,10 @@ fn main() -> Result<(), RtMidiError> {
                 'o' => {
                     cmd_note_off_tx.send(()).unwrap();
                 },
-                't' => {
+                'd' => {
                     cmd_note_test_tx.send(()).unwrap();
                 },
-                'l' | 'r' | 'c' => {
+                't' | 'l' | 'r' | 'c' => {
                     cmd_note_tx.send(c).unwrap();
                 },
                 _ => {}
