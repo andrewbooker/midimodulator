@@ -86,7 +86,7 @@ fn main() -> Result<(), RtMidiError> {
     println!("Playing {} {}", tonic, mode);
 
     let input = RtMidiIn::new(Default::default())?;
-    let input_port = index_of("USB MIDI Interface", &input);
+    let input_port = index_of("4i4o MIDI 4", &input);
     input.open_port(input_port, "RtMidi Input")?;
 
     let stats: [Mutex<NoteStats>; NUM_PARTS] = [
