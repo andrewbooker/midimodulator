@@ -15,3 +15,15 @@ The korg is a rare example of a legacy sound module that is especially suited to
 ##Thru
 The `thru` project directs MIDI in signals to a MIDI out, with some transformation or other.
 
+
+
+##Current Equipment
+
+Korg 05R/W
+- serial connection at the back connects to a serial port on the computer (usually USB adapter unless you have an old motherboard).
+- Korg Midi In comes from first Midi Out on USB adapter
+- Korg Midi Out on drum pad connects to Midi In on USB adapter on the computer
+- Korg audio out goes to mixer. Aux goes to audio in on SPD-SX
+- SPD-SX audio out goes to recorder/mixer
+
+
