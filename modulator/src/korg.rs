@@ -325,10 +325,9 @@ const DISTORTION: Effect = Effect {
 };
 
 
-const AVAILABLE_EFFECTS: [Effect; 3] = [
+const AVAILABLE_EFFECTS: [Effect; 2] = [
     PHASER,
-    TREMOLO,
-    DISTORTION
+    TREMOLO
 ];
 
 
