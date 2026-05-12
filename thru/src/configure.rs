@@ -28,8 +28,8 @@ pub fn configure(route: &Vec<&str>, s: Rc<Scale>, sel: Arc<RwLock<NoteSelector>>
         let next = Rc::clone(&seq[seq.len() - 1]);
         let scale = Rc::clone(&s);
         match &r[..] {
-            "randomOctaveTop" => seq.push(Rc::new(RandomOctaveStage::to(3, 0, next))),
-            "randomOctaveMid" => seq.push(Rc::new(RandomOctaveStage::to(2, -1, next))),
+            "randomOctaveTop" => seq.push(Rc::new(RandomOctaveStage::to(2, 0, next))),
+            "randomOctaveMid" => seq.push(Rc::new(RandomOctaveStage::to(1, -1, next))),
             "randomOctaveBass" => seq.push(Rc::new(RandomOctaveStage::to(0, -2, next))),
             "noteMap" => seq.push(Rc::new(NoteMap { next, scale })),
             "randomNoteMap" => seq.push(Rc::new(RandomNoteMap::create_from(next, Arc::clone(&sel)))),
