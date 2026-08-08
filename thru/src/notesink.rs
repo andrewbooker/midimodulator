@@ -146,7 +146,7 @@ impl MidiNoteSink for NotifyingRandomNoteDropper {
     fn receive(&self, n: &Note, stats: &mut NoteStats) {
         let note = n.note;
         let millis_since_last_dropped = stats.last_dropped.2.elapsed().as_millis();
-        if RandomNoteDropper::should_play() && millis_since_last_dropped > 500u128 {
+        if millis_since_last_dropped > 20u128 {
             self.next.receive(n, stats);
         } else {
             thread::spawn(move || {

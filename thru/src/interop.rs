@@ -22,6 +22,7 @@ pub fn post_cmd_to_recorder(data: JsonValue) {
 }
 
 pub fn post_cmd_to_modulator(note: u8) {
+    post_cmd(9009, object!{ note: note });
     post_cmd(7878, object!{ note: note });
 }
 
