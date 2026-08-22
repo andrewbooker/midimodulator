@@ -10,3 +10,5 @@ sudo dpkg -i librtmidi-dev_3.0.0~ds1-2build1_x86.deb
 cd -
 sudo apt install -y clang
 sudo apt install -y libudev-dev
+sudo usermod -a -G dialout $USER
+
