@@ -95,9 +95,7 @@ fn main() -> Result<(), RtMidiError> {
 
     let scale = Rc::new(Scale::from(tonic, &modes[mode]));
     let selector = Arc::new(RwLock::new(NoteSelector::new(Rc::clone(&scale))));
-
-    let korg_output_stage = Rc::new(OutputStage { midi_out: Arc::clone(&korg_midi_out), hold_length: 1, should_record: false, channel_range: 0 });
-
+    let korg_output_stage = Rc::new(OutputStage { midi_out: Arc::clone(&korg_midi_out), should_record: false, channel_range: 0 });
     let parts: [Rc<dyn MidiNoteSink>; NUM_PARTS] = [
         configure(&korg, Rc::clone(&scale), Arc::clone(&selector), Rc::clone(&korg_output_stage))
     ];
@@ -120,6 +118,8 @@ fn main() -> Result<(), RtMidiError> {
     let (cmd_note_off_tx, cmd_note_off_rx) = mpsc::channel();
     let (cmd_note_test_tx, cmd_note_test_rx) = mpsc::channel();
     let (cmd_note_tx, cmd_note_rx) = mpsc::channel();
+    let (cmd_hold_on_tx, cmd_hold_on_rx) = mpsc::channel();
+    let (cmd_hold_off_tx, cmd_hold_off_rx) = mpsc::channel();
     thread::spawn(move || {
         let g = getch::Getch::new();
         loop {
@@ -137,6 +137,12 @@ fn main() -> Result<(), RtMidiError> {
                 },
                 'c' | 't' | 'l' | 'r' | 'u' | 'd' => {
                     cmd_note_tx.send(c).unwrap();
+                },
+                'h' => {
+                    cmd_hold_on_tx.send(()).unwrap();
+                },
+                'f' => {
+                    cmd_hold_off_tx.send(()).unwrap();
                 },
                 _ => {}
             }
@@ -169,6 +175,26 @@ fn main() -> Result<(), RtMidiError> {
             Ok(n) => {
                 let mut sel = selector.write().unwrap();
                 sel.set_strategy_from(n);
+            },
+            _ => thread::sleep(Duration::from_millis(50))
+        }
+        match cmd_hold_on_rx.try_recv() {
+            Ok(_) => {
+                for i in 0..NUM_PARTS {
+                    let mut st = stats[i].lock().unwrap();
+                    st.hold_on();
+                }
+                println!("Hold on");
+            },
+            _ => thread::sleep(Duration::from_millis(50))
+        }
+        match cmd_hold_off_rx.try_recv() {
+            Ok(_) => {
+                for i in 0..NUM_PARTS {
+                    let mut st = stats[i].lock().unwrap();
+                    st.hold_off();
+                }
+                println!("Hold off");
             },
             _ => thread::sleep(Duration::from_millis(50))
         }
