@@ -294,9 +294,26 @@ const FLANGER1: Effect = Effect {
     mix: 50,
     updater: [
         Updater::Sweep("flangerDepth", 50, 99),
-        Updater::Sweep("flnagerSpeed", 20, 99),
+        Updater::Sweep("flangerSpeed", 20, 99),
         Updater::Sweep("flangerDelay", 1, 99),
         Updater::Sweep("flangerResonance", -99, 99),
+        Updater::Const("", 0),
+        Updater::Const("", 0),
+        Updater::Const("", 0),
+        Updater::Const("", 0),
+        Updater::Const("eff_modSource", 4), // 4, or 5 for the other effect
+        Updater::Const("eff_modAmount", 15), // 15
+    ]
+};
+
+const CHORUS1: Effect = Effect {
+    number: 19,
+    mix: 50,
+    updater: [
+        Updater::Sweep("chorusDepth", 50, 99),
+        Updater::Sweep("chorusSpeed", 20, 99),
+        Updater::Sweep("chorusDelay", 1, 99),
+        Updater::Const("", 0),
         Updater::Const("", 0),
         Updater::Const("", 0),
         Updater::Const("", 0),
@@ -342,9 +359,10 @@ const DISTORTION: Effect = Effect {
 };
 
 
-const AVAILABLE_EFFECTS: [Effect; 2] = [
+const AVAILABLE_EFFECTS: [Effect; 3] = [
     PHASER,
-    FLANGER1
+    FLANGER1,
+    CHORUS1
 ];
 
 
