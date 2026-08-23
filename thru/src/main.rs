@@ -16,9 +16,6 @@ use crate::notesink::{
     NoteSelector
 };
 
-use crate::interop::{
-    post_cmd_to_recorder
-};
 
 use crate::outputstage::{
     send_all_note_off,
@@ -30,7 +27,6 @@ use crate::configure::configure;
 use std::sync::{Arc, mpsc, Mutex, RwLock};
 use std::thread;
 use rtmidi::{RtMidiIn, RtMidiOut, RtMidiError};
-use json::object;
 use std::time::Duration;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -69,8 +65,7 @@ fn index_of(substr: &str, input: &RtMidiIn) -> u32 {
 
 
 const KORG_OUT: &str = "4i4o MIDI 3";
-const D110_OUT: &str = "4i4o MIDI 4";
-const NUM_PARTS: usize = 2;
+const NUM_PARTS: usize = 1;
 
 
 fn main() -> Result<(), RtMidiError> {
@@ -91,24 +86,18 @@ fn main() -> Result<(), RtMidiError> {
     input.open_port(input_port, "RtMidi Input")?;
 
     let stats: [Mutex<NoteStats>; NUM_PARTS] = [
-        Mutex::new(NoteStats::new()),
         Mutex::new(NoteStats::new())
     ];
 
     let korg_midi_out = Arc::new(find_output_from(KORG_OUT));
-    let d110_midi_out = Arc::new(find_output_from(D110_OUT));
-
     let korg = vec!("randomNoteMap", "randomOctaveMid");
-    let d110 = vec!("notifyingDropper", "randomNoteMap", "randomOctaveTop");
 
     let scale = Rc::new(Scale::from(tonic, &modes[mode]));
     let selector = Arc::new(RwLock::new(NoteSelector::new(Rc::clone(&scale))));
 
-    let d110_output_stage = Rc::new(OutputStage { midi_out: Arc::clone(&d110_midi_out), hold_length: 1, should_record: false, channel_range: 0 });
-    let korg_output_stage = Rc::new(OutputStage { midi_out: Arc::clone(&korg_midi_out), hold_length: 0, should_record: true, channel_range: 0 });
+    let korg_output_stage = Rc::new(OutputStage { midi_out: Arc::clone(&korg_midi_out), hold_length: 1, should_record: false, channel_range: 0 });
 
     let parts: [Rc<dyn MidiNoteSink>; NUM_PARTS] = [
-        configure(&d110, Rc::clone(&scale), Arc::clone(&selector), Rc::clone(&d110_output_stage)),
         configure(&korg, Rc::clone(&scale), Arc::clone(&selector), Rc::clone(&korg_output_stage))
     ];
 
@@ -163,11 +152,8 @@ fn main() -> Result<(), RtMidiError> {
         }
         match cmd_note_off_rx.try_recv() {
             Ok(_) => {
-                post_cmd_to_recorder(object!{
-                    action: "off"
-                });
                 send_all_note_off(&korg_midi_out);
-                send_all_note_off(&d110_midi_out);
+                println!("All notes off");
             },
             _ => thread::sleep(Duration::from_millis(50))
         }
@@ -175,7 +161,6 @@ fn main() -> Result<(), RtMidiError> {
             Ok(_) => {
                 let c = 0;
                 korg_midi_out.message(&[0x90 | c, 60, 99]).unwrap();
-                d110_midi_out.message(&[0x90 | c, 60, 99]).unwrap();
             },
             _ => thread::sleep(Duration::from_millis(50))
         }
