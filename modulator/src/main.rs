@@ -213,7 +213,7 @@ fn modulate_korg<C>(cmd_dump_rx: &Receiver<C>, res_tx: &Sender<HashMap<std::stri
 
 fn main() {
     //let d110_number = MidiOutDevices::index_of("4i4o MIDI 4").unwrap();
-    let korg_number = MidiOutDevices::index_of("4i4o MIDI 3").unwrap();
+    let korg_number = MidiOutDevices::index_of("USB Midi").unwrap();
     //println!("D110 port {}", d110_number);
     println!("Korg port {}", korg_number);
 
