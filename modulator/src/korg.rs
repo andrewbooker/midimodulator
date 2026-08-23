@@ -293,7 +293,7 @@ const FLANGER: Effect = Effect {
     number: 26,
     mix: 50,
     updater: [
-        Updater::Sweep("flangerDelay", 1, 127),
+        Updater::Sweep("flangerDelay", 1, 127), // should be 200
         Updater::Sweep("flangerDepth", 20, 99),
         Updater::Sweep("flangerSpeed", 20, 99),
         Updater::Sweep("flangerResonance", -99, 99),
@@ -313,11 +313,29 @@ const CHORUS: Effect = Effect {
         Updater::Sweep("chorusDepth", 50, 99),
         Updater::Sweep("chorusSpeed", 20, 99),
         Updater::Const("chorusWaveform", 0),
-        Updater::Sweep("chorusDelay", 1, 99),
+        Updater::Sweep("chorusDelay", 1, 127), // should be 200
         Updater::Const("", 0),
         Updater::Const("", 0),
         Updater::Sweep("chorusEqLow", -12, 12),
         Updater::Sweep("chorusEqHigh", -12, 12),
+        Updater::Const("eff_modSource", 4), // 4, or 5 for the other effect
+        Updater::Const("eff_modAmount", 15), // 15
+    ]
+};
+
+
+const HARMONIC_CHORUS: Effect = Effect {
+    number: 23,
+    mix: 50,
+    updater: [
+        Updater::Sweep("harmonicChorusLLo", 1, 127), // should be 500
+        Updater::Sweep("harmonicChorusLHi", 1, 127),
+        Updater::Sweep("harmonicChorusRLo", 1, 127),
+        Updater::Sweep("harmonicChorusRHi", 1, 127),
+        Updater::Sweep("harmonicChorusDepth", 50, 99),
+        Updater::Sweep("harmonicChorusSpeed", 20, 99),
+        Updater::Sweep("harmonicChorusFilterSplit", 0, 18),
+        Updater::Const("", 0),
         Updater::Const("eff_modSource", 4), // 4, or 5 for the other effect
         Updater::Const("eff_modAmount", 15), // 15
     ]
@@ -394,12 +412,32 @@ const ENHANCER: Effect = Effect {
 };
 
 
-const AVAILABLE_EFFECTS: [Effect; 5] = [
+const SYMPHONIC: Effect = Effect {
+    number: 24,
+    mix: 50,
+    updater: [
+        Updater::Sweep("symphonicDepth", 20, 99),
+        Updater::Const("", 0),
+        Updater::Const("", 0),
+        Updater::Const("", 0),
+        Updater::Const("", 0),
+        Updater::Const("", 0),
+        Updater::Sweep("symphonicEqLow", -12, 12),
+        Updater::Sweep("symphonicEqHigh", -12, 12),
+        Updater::Const("eff_modSource", 4), // 4, or 5 for the other effect
+        Updater::Const("eff_modAmount", 15), // 15
+    ]
+};
+
+
+const AVAILABLE_EFFECTS: [Effect; 7] = [
     PHASER,
     FLANGER,
     CHORUS,
+    HARMONIC_CHORUS,
     EXCITER,
-    ENHANCER
+    ENHANCER,
+    SYMPHONIC
 ];
 
 
