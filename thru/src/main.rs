@@ -70,6 +70,7 @@ const NUM_PARTS: usize = 1;
 
 fn main() -> Result<(), RtMidiError> {
     let modes: HashMap<&str, Mode> = HashMap::from([
+        ("minorpentatonic", [3, 2, 2, 3, 2, 3]),
         ("aeolian", [2, 1, 2, 2, 1, 2]),
         ("lydian", [2, 2, 2, 1, 2, 2]),
         ("mixolydian", [2, 2, 1, 2, 2, 1])
@@ -77,7 +78,7 @@ fn main() -> Result<(), RtMidiError> {
 
     let args: Vec<_> = env::args().collect();
     let tonic = if args.len() > 1 { args[1].parse::<u8>().unwrap() } else { 65 };
-    let mode = if args.len() > 2 { args[2].as_str() } else { "mixolydian" };
+    let mode = if args.len() > 2 { args[2].as_str() } else { "minorpentatonic" };
 
     println!("Playing {} {}", tonic, mode);
 
