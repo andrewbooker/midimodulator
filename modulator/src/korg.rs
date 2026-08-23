@@ -289,6 +289,23 @@ const PHASER: Effect = Effect {
     ]
 };
 
+const FLANGER1: Effect = Effect {
+    number: 25,
+    mix: 50,
+    updater: [
+        Updater::Sweep("flangerDepth", 50, 99),
+        Updater::Sweep("flnagerSpeed", 20, 99),
+        Updater::Sweep("flangerDelay", 1, 99),
+        Updater::Sweep("flangerResonance", -99, 99),
+        Updater::Const("", 0),
+        Updater::Const("", 0),
+        Updater::Const("", 0),
+        Updater::Const("", 0),
+        Updater::Const("eff_modSource", 4), // 4, or 5 for the other effect
+        Updater::Const("eff_modAmount", 15), // 15
+    ]
+};
+
 const TREMOLO: Effect = Effect {
     number: 36,
     mix: 99,
@@ -327,7 +344,7 @@ const DISTORTION: Effect = Effect {
 
 const AVAILABLE_EFFECTS: [Effect; 2] = [
     PHASER,
-    TREMOLO
+    FLANGER1
 ];
 
 
