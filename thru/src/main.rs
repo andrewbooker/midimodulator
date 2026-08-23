@@ -190,6 +190,7 @@ fn main() -> Result<(), RtMidiError> {
         }
         match cmd_hold_off_rx.try_recv() {
             Ok(_) => {
+                send_all_note_off(&korg_midi_out);
                 for i in 0..NUM_PARTS {
                     let mut st = stats[i].lock().unwrap();
                     st.hold_off();
