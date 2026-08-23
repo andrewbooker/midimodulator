@@ -289,35 +289,35 @@ const PHASER: Effect = Effect {
     ]
 };
 
-const FLANGER1: Effect = Effect {
-    number: 25,
+const FLANGER: Effect = Effect {
+    number: 26,
     mix: 50,
     updater: [
-        Updater::Sweep("flangerDepth", 50, 99),
+        Updater::Sweep("flangerDelay", 1, 127),
+        Updater::Sweep("flangerDepth", 20, 99),
         Updater::Sweep("flangerSpeed", 20, 99),
-        Updater::Sweep("flangerDelay", 1, 99),
         Updater::Sweep("flangerResonance", -99, 99),
         Updater::Const("", 0),
         Updater::Const("", 0),
-        Updater::Const("", 0),
-        Updater::Const("", 0),
+        Updater::Sweep("flangerEqLow", -12, 12),
+        Updater::Sweep("flangerEqHigh", -12, 12),
         Updater::Const("eff_modSource", 4), // 4, or 5 for the other effect
         Updater::Const("eff_modAmount", 15), // 15
     ]
 };
 
-const CHORUS1: Effect = Effect {
-    number: 19,
+const CHORUS: Effect = Effect {
+    number: 20,
     mix: 50,
     updater: [
         Updater::Sweep("chorusDepth", 50, 99),
         Updater::Sweep("chorusSpeed", 20, 99),
+        Updater::Const("chorusWaveform", 0),
         Updater::Sweep("chorusDelay", 1, 99),
         Updater::Const("", 0),
         Updater::Const("", 0),
-        Updater::Const("", 0),
-        Updater::Const("", 0),
-        Updater::Const("", 0),
+        Updater::Sweep("chorusEqLow", -12, 12),
+        Updater::Sweep("chorusEqHigh", -12, 12),
         Updater::Const("eff_modSource", 4), // 4, or 5 for the other effect
         Updater::Const("eff_modAmount", 15), // 15
     ]
@@ -351,18 +351,36 @@ const DISTORTION: Effect = Effect {
         Updater::Const("distOut", 50),
         Updater::Const("", 0),
         Updater::Const("", 0),
-        Updater::Const("", 0),
-        Updater::Const("", 0),
+        Updater::Sweep("distEqLow", -12, 12),
+        Updater::Sweep("distEqHigh", -12, 12),
         Updater::Const("eff_modSource", 4), // 4, or 5 for the other effect
         Updater::Const("eff_modAmount", 15) // 15
     ]
 };
 
+const EXCITER: Effect = Effect {
+    number: 28,
+    mix: 50,
+    updater: [
+        Updater::Sweep("exciterBlend", -99, 99),
+        Updater::Sweep("exciterEmphaticPoint", 1, 10),
+        Updater::Const("", 0),
+        Updater::Const("", 0),
+        Updater::Const("", 0),
+        Updater::Const("", 0),
+        Updater::Sweep("exciterEqLow", -12, 12),
+        Updater::Sweep("exciterEqHigh", -12, 12),
+        Updater::Const("eff_modSource", 4), // 4, or 5 for the other effect
+        Updater::Const("eff_modAmount", 15), // 15
+    ]
+};
 
-const AVAILABLE_EFFECTS: [Effect; 3] = [
+
+const AVAILABLE_EFFECTS: [Effect; 4] = [
     PHASER,
-    FLANGER1,
-    CHORUS1
+    FLANGER,
+    CHORUS,
+    EXCITER
 ];
 
 
