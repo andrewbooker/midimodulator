@@ -376,11 +376,30 @@ const EXCITER: Effect = Effect {
 };
 
 
-const AVAILABLE_EFFECTS: [Effect; 4] = [
+const ENHANCER: Effect = Effect {
+    number: 29,
+    mix: 50,
+    updater: [
+        Updater::Sweep("enhancerDensity", 20, 99),
+        Updater::Sweep("enhancerHotSpot", 1, 99),
+        Updater::Sweep("enhancerStereoWidth", 1, 99),
+        Updater::Sweep("enhancerDelay", 1, 99),
+        Updater::Const("", 0),
+        Updater::Const("", 0),
+        Updater::Sweep("enhancerEqLow", -12, 12),
+        Updater::Sweep("enhancerEqHigh", -12, 12),
+        Updater::Const("eff_modSource", 4), // 4, or 5 for the other effect
+        Updater::Const("eff_modAmount", 15), // 15
+    ]
+};
+
+
+const AVAILABLE_EFFECTS: [Effect; 5] = [
     PHASER,
     FLANGER,
     CHORUS,
-    EXCITER
+    EXCITER,
+    ENHANCER
 ];
 
 
