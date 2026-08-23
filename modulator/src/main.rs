@@ -212,12 +212,12 @@ fn modulate_korg<C>(cmd_dump_rx: &Receiver<C>, res_tx: &Sender<HashMap<std::stri
 
 
 fn main() {
-    let d110_number = MidiOutDevices::index_of("4i4o MIDI 4").unwrap();
+    //let d110_number = MidiOutDevices::index_of("4i4o MIDI 4").unwrap();
     let korg_number = MidiOutDevices::index_of("4i4o MIDI 3").unwrap();
-    println!("D110 port {}", d110_number);
+    //println!("D110 port {}", d110_number);
     println!("Korg port {}", korg_number);
 
-    thread::spawn(move || { receive_play_notifications(d110_number); });
+    //thread::spawn(move || { receive_play_notifications(d110_number); });
 
     let mut midi_out = MidiOut::using_device(korg_number);
     midi_out.send_sys_ex(&KorgInitSysEx::new(0x02).data); // select prog
@@ -226,11 +226,6 @@ fn main() {
 
     midi_out.send_sys_ex(&KorgInitSysEx::new(0x03).data); // edit prog
     midi_out.send_sys_ex(&KorgSingleParamSysEx::new(0, 1).data); // oscillator mode: Double, on UI, otherwise the screen value overrides th sysEx
-
-    let ports = serialport::available_ports().expect("No ports found!");
-    for p in ports {
-        println!("{} available", p.port_name);
-    }
 
     let (cmd_dump_tx, cmd_dump_rx) = mpsc::channel();
     let (cmd_stop_tx, cmd_stop_rx) = mpsc::channel();
