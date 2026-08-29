@@ -77,7 +77,7 @@ fn main() -> Result<(), RtMidiError> {
     ]);
 
     let args: Vec<_> = env::args().collect();
-    let tonic = if args.len() > 1 { args[1].parse::<u8>().unwrap() } else { 65 };
+    let tonic = if args.len() > 1 { args[1].parse::<u8>().unwrap() } else { 57 };
     let mode = if args.len() > 2 { args[2].as_str() } else { "minorpentatonic" };
 
     println!("Playing {} {}", tonic, mode);
@@ -100,12 +100,24 @@ fn main() -> Result<(), RtMidiError> {
         configure(&korg, Rc::clone(&scale), Arc::clone(&selector), Rc::clone(&korg_output_stage))
     ];
 
+    let (cmd_stop_tx, cmd_stop_rx) = mpsc::channel();
+    let (cmd_note_off_tx, cmd_note_off_rx) = mpsc::channel();
+    let (cmd_note_test_tx, cmd_note_test_rx) = mpsc::channel();
+    let (cmd_note_tx, cmd_note_rx) = mpsc::channel();
+    let (cmd_hold_on_tx, cmd_hold_on_rx) = mpsc::channel();
+    let (cmd_hold_off_tx, cmd_hold_off_rx) = mpsc::channel();
+
     input.set_callback(|_timestamp, message| {
         if message[0] == 0x90 && message[2] != 0 {
             let n = Note::from_midi_message(&message);
-            for i in 0..NUM_PARTS {
-                let mut st = stats[i].lock().unwrap();
-                parts[i].receive(&n, &mut st);
+            match n.note {
+                101 => cmd_note_off_tx.send(()).unwrap(),
+                102 => cmd_hold_off_tx.send(()).unwrap(),
+                103 => cmd_hold_on_tx.send(()).unwrap(),
+                _ => for i in 0..NUM_PARTS {
+                    let mut st = stats[i].lock().unwrap();
+                    parts[i].receive(&n, &mut st);
+                }
             }
         }
     })?;
@@ -113,13 +125,6 @@ fn main() -> Result<(), RtMidiError> {
     input.ignore_types(true, true, true)?;
 
     println!("Starting...");
-
-    let (cmd_stop_tx, cmd_stop_rx) = mpsc::channel();
-    let (cmd_note_off_tx, cmd_note_off_rx) = mpsc::channel();
-    let (cmd_note_test_tx, cmd_note_test_rx) = mpsc::channel();
-    let (cmd_note_tx, cmd_note_rx) = mpsc::channel();
-    let (cmd_hold_on_tx, cmd_hold_on_rx) = mpsc::channel();
-    let (cmd_hold_off_tx, cmd_hold_off_rx) = mpsc::channel();
     thread::spawn(move || {
         let g = getch::Getch::new();
         loop {
