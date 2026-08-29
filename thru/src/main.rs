@@ -77,7 +77,7 @@ fn main() -> Result<(), RtMidiError> {
     ]);
 
     let args: Vec<_> = env::args().collect();
-    let tonic = if args.len() > 1 { args[1].parse::<u8>().unwrap() } else { 57 };
+    let tonic = if args.len() > 1 { args[1].parse::<u8>().unwrap() } else { 69 };
     let mode = if args.len() > 2 { args[2].as_str() } else { "minorpentatonic" };
 
     println!("Playing {} {}", tonic, mode);
@@ -111,6 +111,7 @@ fn main() -> Result<(), RtMidiError> {
         if message[0] == 0x90 && message[2] != 0 {
             let n = Note::from_midi_message(&message);
             match n.note {
+                100 => cmd_note_tx.send('u' as u8).unwrap(),
                 101 => cmd_note_off_tx.send(()).unwrap(),
                 102 => cmd_hold_off_tx.send(()).unwrap(),
                 103 => cmd_hold_on_tx.send(()).unwrap(),
