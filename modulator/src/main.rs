@@ -274,11 +274,11 @@ fn main() {
         }
         match edit_korg_rx.try_recv() {
             Ok(0) => {
-                midi_out.send_sys_ex(&KorgInitSysEx::new(0x02).data); // select prog deselect edit
+                //midi_out.send_sys_ex(&KorgInitSysEx::new(0x02).data); // select prog deselect edit
                 println!("edit off");
             },
             Ok(1) => {
-                midi_out.send_sys_ex(&KorgInitSysEx::new(0x03).data); // select prog edit
+                //midi_out.send_sys_ex(&KorgInitSysEx::new(0x03).data); // select prog edit
                 println!("edit on");
             },
             _ => {}

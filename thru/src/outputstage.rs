@@ -19,10 +19,32 @@ use std::thread;
 use std::time::Duration;
 
 
+pub struct KorgInitSysEx {
+    pub data: [u8; 8]
+}
+
+impl KorgInitSysEx {
+    pub fn new(mode: u8) -> KorgInitSysEx {
+        KorgInitSysEx {
+            data: [0xF0,
+                   0x42, // ID of Korg
+                   0x30 | 0, // format ID (3), channel
+                   0x36, // 05R/W ID
+                   0x4E, // mode change
+                   mode,
+                   0x00,
+                   0xF7]
+        }
+    }
+}
+
+
 pub fn send_all_note_off(midi_out: &RtMidiOut) {
+    midi_out.message(&KorgInitSysEx::new(0x03).data).unwrap();
     for c in 0..16 {
         midi_out.message(&[0xB0 | c, 0x7B, 0]).unwrap();
     }
+    midi_out.message(&KorgInitSysEx::new(0x02).data).unwrap();
 }
 
 
