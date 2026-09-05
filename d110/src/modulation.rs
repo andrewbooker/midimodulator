@@ -15,12 +15,6 @@ pub trait SysExComposer {
     fn name(&mut self, n: &str);
 }
 
-pub trait Selector {
-    fn next1(&mut self);
-    fn next2(&mut self);
-
-    fn val(&self, idx: u8) -> u16;
-}
 
 pub struct SweepState {
     pub val: i8, // public so the app can print it
@@ -92,11 +86,9 @@ impl PairedUpdater<'_> {
         *v = SweepState::updated_from(&v, nv);
     }
 
-    pub fn update<'a, S: SysExComposer, O: Selector, E: Selector>(
+    pub fn update<'a, S: SysExComposer>(
         &mut self,
         sys_ex: &mut S,
-        osc_selector: &mut O,
-        effect_selector: &mut E,
         updaters: &'a [Updater],
         prefix: Option<&str>)
     {

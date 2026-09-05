@@ -20,8 +20,7 @@ use crate::modulation::{
     SysExComposer,
     PairedUpdater,
     StepInterval,
-    SweepState,
-    Selector
+    SweepState
 };
 
 
@@ -35,22 +34,6 @@ use std::{
     collections::HashMap
 };
 use rand::prelude::SliceRandom;
-
-
-struct DummySelector;
-
-impl DummySelector {
-    fn new() -> DummySelector {
-        DummySelector {}
-    }
-}
-
-impl Selector for DummySelector {
-    fn next1(&mut self) {}
-    fn next2(&mut self) {}
-
-    fn val(&self, _: u8) -> u16 { 0 }
-}
 
 
 struct TimeBasedInterval {
@@ -108,8 +91,6 @@ fn send(d110_number: i32, number: u8) {
     let count: u32 = 1;
     let interval = FixedEquivalentMillisInterval::new(1000 * count);
     let mut updater = PairedUpdater::new(&interval);
-    let mut dummy_1 = DummySelector::new();
-    let mut dummy_2 = DummySelector::new();
 
     let tones: [& mut D110SysEx; NUM_D110_PARTS] = [
         &mut set_up_tone(1),
@@ -123,7 +104,7 @@ fn send(d110_number: i32, number: u8) {
     let prefixes = ["A_1", "B_3", "C_2", "D_4"];
     for t in 0..NUM_D110_PARTS {
         for p in prefixes {
-            updater.update(tones[t], &mut dummy_1, &mut dummy_2, &PARTIAL_SPEC, Some(&*format!("tone{}_partial{}", t + 1, p)));
+            updater.update(tones[t], &PARTIAL_SPEC, Some(&*format!("tone{}_partial{}", t + 1, p)));
         }
     }
 
