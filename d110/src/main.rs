@@ -120,7 +120,7 @@ fn update_d110(updater: &mut PairedUpdater, d110_midi_out: &mut MidiOut) {
 
 
 
-fn start(d110_number: i32) {
+fn send(d110_number: i32) {
     let mut d110_midi_out = MidiOut::using_device(d110_number);
     let d110_init = init_d110();
     d110_midi_out.send_sys_ex(&d110_init.to_send());
@@ -138,11 +138,45 @@ fn start(d110_number: i32) {
     let interval = FixedEquivalentMillisInterval::new(1000 * count);
     let mut updater = PairedUpdater::new(&interval);
     update_d110(&mut updater, &mut d110_midi_out);
+
+    let note: u8 = 69;
+    let channel: u8 = 0;
+    let on = MidiMessage::note_on(channel, note, 100);
+    d110_midi_out.send(&on);
+    thread::sleep(Duration::from_millis(100));
+    let off = MidiMessage::note_off(channel, note);
+    d110_midi_out.send(&off);
 }
+
 
 
 fn main() {
     let d110_number = MidiOutDevices::index_of("USB MIDI").unwrap();
     println!("D110 port {}", d110_number);
-    start(d110_number);
+    send(d110_number);
+
+    let (cmd_stop_tx, cmd_stop_rx) = mpsc::channel();
+
+    thread::spawn(move || {
+        let g = getch::Getch::new();
+        loop {
+            let c: u8 = g.getch().unwrap();
+            match c as char {
+                'q' => {
+                    cmd_stop_tx.send(()).unwrap();
+                    break;
+                },
+                _ => {}
+            }
+        }
+    });
+    loop {
+        match cmd_stop_rx.try_recv() {
+            Ok(_) => {
+                println!("Stopping...");
+                break;
+            },
+            _ => {}
+        }
+    }
 }
