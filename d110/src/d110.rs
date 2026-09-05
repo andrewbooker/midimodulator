@@ -148,7 +148,7 @@ pub fn set_up_tone(number: u8) -> D110SysEx {
     sys_ex.data_u8(0); // 0 = ss, 5 = pp
     sys_ex.data_u8(0); // 0 = ss, 5 = pp
     sys_ex.data_u8(if number < 7 { 0xF } else { 0 }); // partial enable
-    sys_ex.data_u8(0); // envelope mode
+    sys_ex.data_u8(0); // envelope mode (0: normal, 1: no sustain?)
     sys_ex
 }
 
@@ -167,16 +167,16 @@ pub const PARTIAL_SPEC: [Updater; 58] = [
     Updater::Sweep("pitchEnvelopeDepth", 1, 5), // 1-100
     Updater::Const(2), // pitchEnvelopeVelocityMod: 0-3
     Updater::Const(0), // pitchEnvelopeTimeKeyFollow: 0-4
-    Updater::Sweep("env_pitch_attackTime", 1, 5), //
-    Updater::Sweep("env_pitch_decayTime", 1, 6),  // make these times longer for massive pitch fun
-    Updater::Sweep("env_pitch_slopeTime", 5, 99),
-    Updater::Sweep("env_pitch_releaseTime", 5, 99),
-    Updater::Sweep("env_pitch_startLevel", 10, 90),
+    Updater::Sweep("env_pitch_attackTime", 1, 49), //
+    Updater::Sweep("env_pitch_decayTime", 1, 49),  // make these times longer for massive pitch fun
+    Updater::Sweep("env_pitch_slopeTime", 5, 49),
+    Updater::Sweep("env_pitch_releaseTime", 5, 49),
+    Updater::Sweep("env_pitch_startLevel", 49, 51),
     Updater::Sweep("env_pitch_attackLevel", 40, 60),
-    Updater::Sweep("env_pitch_breakPoint", 43, 57), // decay level
+    Updater::Sweep("env_pitch_breakPoint", 49, 51), // decay level
     Updater::Sweep("env_pitch_sustainLevel", 45, 55),
     Updater::Sweep("env_pitch_releaseLevel", 45, 50),
-    Updater::Sweep("pitchLfoRate", 10, 70),
+    Updater::Sweep("pitchLfoRate", 1, 70),
     Updater::Sweep("pitchLfoDepth", 30, 70),
     Updater::Const(50), // pitchLfoModSens: not swept.  mod wheel?
     Updater::Sweep("envFilterFreq", 10, 95), // note no filtering on pcm sounds, only waveform.
@@ -188,9 +188,9 @@ pub const PARTIAL_SPEC: [Updater; 58] = [
     Updater::Const(50), // envFilterVelocityMod: 0-100 -> +/- 50
     Updater::Const(0), // envFilterDepthKeyFollow: 0-4
     Updater::Const(0), // envFilterTimeKeyFollow: 0-4
-    Updater::Sweep("env_filter_attackTime", 1, 10),
-    Updater::Sweep("env_filter_decayTime", 4, 10),
-    Updater::Sweep("env_filter_attack2Time", 1, 10),
+    Updater::Sweep("env_filter_attackTime", 1, 99),
+    Updater::Sweep("env_filter_decayTime", 4, 99),
+    Updater::Sweep("env_filter_attack2Time", 1, 99),
     Updater::Sweep("env_filter_slopeTime", 5, 99),
     Updater::Sweep("env_filter_releaseTime", 5, 99),
     Updater::Sweep("env_filter_attackLevel", 10, 90),
@@ -204,14 +204,14 @@ pub const PARTIAL_SPEC: [Updater; 58] = [
     Updater::Const(0), // amplEnvUpperBiasPoint
     Updater::Const(12),  // amplEnvUpperBiasLevel
     Updater::Const(0),  // amplEnvTimeKeyFollow
-    Updater::Const(0),  // amplEnvAttackTimeKeyFollow
-    Updater::Sweep("env_amplitude_attackTime", 1, 10),
-    Updater::Sweep("env_amplitude_decayTime", 4, 10),
-    Updater::Sweep("env_amplitude_attack2Time", 1, 10),
-    Updater::Sweep("env_amplitude_slopeTime", 5, 99),
-    Updater::Const(0), // env_amplitude_releaseTime: 5, 99),  // less extreme, and needs to depend on overall note length requirement
-    Updater::Sweep("env_amplitude_attackLevel", 70, 99), // pair up 1+2, 3+4 and make the pairs change in complements. apexes are switchover points, the one at zero is reset.
+    Updater::Const(6),  // amplEnvAttackTimeKeyFollow
+    Updater::Sweep("env_amplitude_attackTime", 50, 99),
+    Updater::Sweep("env_amplitude_decayTime", 4, 99),
+    Updater::Sweep("env_amplitude_attack2Time", 40, 99),
+    Updater::Sweep("env_amplitude_slopeTime", 40, 99),
+    Updater::Sweep("env_amplitude_releaseTime", 50, 99), // env_amplitude_releaseTime: 5, 99),  // less extreme, and needs to depend on overall note length requirement
+    Updater::Const(99), // env_amplitude_attackLevel: pair up 1+2, 3+4 and make the pairs change in complements. apexes are switchover points, the one at zero is reset.
     Updater::Sweep("env_amplitude_breakPoint", 43, 57),
-    Updater::Sweep("env_amplitude_attack2Level", 10, 90),
+    Updater::Sweep("env_amplitude_attack2Level", 50, 90),
     Updater::Sweep("env_amplitude_sustainLevel", 45, 55)
 ];
