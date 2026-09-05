@@ -98,57 +98,57 @@ pub const ENV_TIME_LOW: i8 = 1;
 pub const ENV_TIME_HIGH: i8 = 10;
 
 pub const PROGRAM_SPEC: [Updater; 28] = [
-    Updater::Const("", 1), // oscillatorMode
-    Updater::Const("", 0), // noteMode
+    Updater::Const(1),  // oscillatorMode
+    Updater::Const(0),  // noteMode
     Updater::SelectOnZero("osc1"),
-    Updater::Const("", 0), // osc1Register
+    Updater::Const(0),  // osc1Register
     Updater::SelectOnZero("osc2"),
-    Updater::Const("", 0), // osc2Register
-    Updater::Const("", 0), // octave
+    Updater::Const(0),  // osc2Register
+    Updater::Const(0),  // octave
     Updater::Sweep("detune", -17, 17),
-    Updater::Const("", 0), // delay
+    Updater::Const(0),  // delay
 
-    Updater::Const("env_pitch_startLevel", 0),
+    Updater::Const(0),  // env_pitch_startLevel
     Updater::Sweep("env_pitch_attackTime", 1, 4),
     Updater::Sweep("env_pitch_attackLevel", -7, 7),
     Updater::Sweep("env_pitch_decayTime", ENV_TIME_LOW, ENV_TIME_HIGH),
     Updater::Sweep("env_pitch_releaseTime", ENV_TIME_LOW, ENV_TIME_HIGH),
     Updater::Sweep("env_pitch_releaseLevel", -8, 0),
 
-    Updater::Const("pitchEgTimeVelocitySens", 0),
-    Updater::Const("pitchEgLevelVelocitySens", 0),
-    Updater::Const("cutoffTypeDetails", 0), // cutoff type (bits 1-4 = waveform 0=TRI, bit5=osc1 enable, bit6=osc2 enable, bit7=key sync)
+    Updater::Const(0),  // pitchEgTimeVelocitySens
+    Updater::Const(0),  // pitchEgLevelVelocitySens
+    Updater::Const(0),  // cutoffTypeDetails: cutoff type (bits 1-4 = waveform 0=TRI, bit5=osc1 enable, bit6=osc2 enable, bit7=key sync)
     Updater::Sweep("modFreq", 20, 99),
     Updater::Sweep("modDelay", 1, 40),
     Updater::Sweep("modIntensity", 1, 40),
 
-    Updater::Const("pitchBendRange", 0),
-    Updater::Const("vdfCutoff", 0),
-    Updater::Const("vdfModulationIntensity", 0),
-    Updater::Const("vdaAmplitude", 0),
-    Updater::Const("joystickPitchBendRange", 0),
-    Updater::Const("joystickVdfSweepIntensity", 0),
-    Updater::Const("joystickVdfModulationIntensity", 0)
+    Updater::Const(0),  // pitchBendRange
+    Updater::Const(0),  // vdfCutoff
+    Updater::Const(0),  // vdfModulationIntensity
+    Updater::Const(0),  // vdaAmplitude
+    Updater::Const(0),  // joystickPitchBendRange
+    Updater::Const(0),  // joystickVdfSweepIntensity
+    Updater::Const(0)   // joystickVdfModulationIntensity
 ];
 
 pub const OSC_SPEC: [Updater; 47] = [
     Updater::Sweep("pitchEgIntensity", 1, 20),
-    Updater::Const("pitchWaveform", 0), // bits 1-4 = waveform, bit7=key sync)
+    Updater::Const(0), // pitchWaveform: bits 1-4 = waveform, bit7=key sync)
     Updater::Sweep("pitchEgFreq", 10, 50),
     Updater::Sweep("pitchEgDelay", 5, 50),
     Updater::Sweep("pitchEgFadeIn", 3, 20),
     Updater::Sweep("pitchModulationIntensity", 1, 10),
-    Updater::Const("pitchFreqModKeyTracking", -5),
-    Updater::Const("pitchModIntensityAftertouch", 0),
-    Updater::Const("pitchModIntensityJoystick", 0),
-    Updater::Const("pitchFreqModAftertouchJoystick", 0),
+    Updater::Const(-5),  // pitchFreqModKeyTracking
+    Updater::Const(0),  // pitchModIntensityAftertouch
+    Updater::Const(0),  // pitchModIntensityJoystick
+    Updater::Const(0),  // pitchFreqModAftertouchJoystick
     Updater::Sweep("vdfCutoff", 40, 80),
-    Updater::Const("vdfCutoffKeybTrackKey", 64),
-    Updater::Const("vdfCutoffKeybTrackIntensity", 64),
+    Updater::Const(64),  // vdfCutoffKeybTrackKey
+    Updater::Const(64),  // vdfCutoffKeybTrackIntensity
     Updater::Sweep("vdfEgIntensity", 20, 99),
-    Updater::Const("vdfEgTimeKeybTrack", 50),
-    Updater::Const("vdfEgTimeVelocitySens", 20),
-    Updater::Const("vdfEgIntensityVelocitySens", 70),
+    Updater::Const(50),  // vdfEgTimeKeybTrack
+    Updater::Const(20),  // vdfEgTimeVelocitySens
+    Updater::Const(70),  // vdfEgIntensityVelocitySens
     Updater::Sweep("env_filter_attackTime", 1, 10),
     Updater::Sweep("env_filter_attackLevel", -10, 90),
     Updater::Sweep("env_filter_decayTime", ENV_TIME_LOW, ENV_TIME_HIGH),
@@ -158,11 +158,11 @@ pub const OSC_SPEC: [Updater; 47] = [
     Updater::Sweep("env_filter_releaseTime", 30, 60),
     Updater::Sweep("env_filter_releaseLevel", -90, 90),
     Updater::PairedInverseSweep(), // vol
-    Updater::Const("oscKeybTrackKey", 0),
-    Updater::Const("amplKeybTrackKeyIntensity", 0),
-    Updater::Const("amplVelocitySens", 11),
-    Updater::Const("amplEgTimeKeybTrack", 50),
-    Updater::Const("amplEgTimeVelocitySens", 10),
+    Updater::Const(0),  // oscKeybTrackKey
+    Updater::Const(0),  // amplKeybTrackKeyIntensity
+    Updater::Const(11),  // amplVelocitySens
+    Updater::Const(50),  // amplEgTimeKeybTrack
+    Updater::Const(10),  // amplEgTimeVelocitySens
     Updater::Sweep("env_amplitude_attackTime", 1, 10),
     Updater::Sweep("env_amplitude_attackLevel", 60, 80),
     Updater::Sweep("env_amplitude_decayTime", ENV_TIME_LOW, ENV_TIME_HIGH),
@@ -170,17 +170,16 @@ pub const OSC_SPEC: [Updater; 47] = [
     Updater::Sweep("env_amplitude_slopeTime", 5, 60),
     Updater::Sweep("env_amplitude_sustainLevel", 40, 90),
     Updater::Sweep("env_amplitude_releaseTime", 5, 80),
-    Updater::Const("freq_EgTimeKeybTrackSwitchPolarity", 0),
-    Updater::Const("freq_EgTimeVelocitySwitchPolarity", 0),
-    Updater::Const("ampl_EgTimeKeybTrackSwitchPolarity", 0),
-    Updater::Const("", 0), //
+    Updater::Const(0), // freq_EgTimeKeybTrackSwitchPolarity
+    Updater::Const(0), // freq_EgTimeVelocitySwitchPolarity
+    Updater::Const(0), // ampl_EgTimeKeybTrackSwitchPolarity
+    Updater::Const(0), // ampl_EgTimeVelocitySwitchPolarity
     Updater::PairedInverseConst(-103), // cdSend, 0x99  
     Updater::Sweep("filterQ", 20, 99),
-    Updater::Const("colourVelocitySens", 56),
-    Updater::Const("vdfVdaKeyboardTrackMode", 0),
-    Updater::Const("panCentre", 0x0F) // pan 0: A15, 0x0F: centre, 0x1E: B15
+    Updater::Const(56), // colourVelocitySens
+    Updater::Const(0), // vdfVdaKeyboardTrackMode
+    Updater::Const(0x0F) // pan 0: A15, 0x0F: centre, 0x1E: B15
 ];
-
 
 
 pub struct KorgOscSelector {
@@ -278,14 +277,14 @@ const PHASER: Effect = Effect {
     updater: [
         Updater::Sweep("phaserDepth", 50, 99),
         Updater::Sweep("phaserSpeed", 20, 99), // could make this const as the modulation varies it
-        Updater::Const("phaserWaveform", 0), // 0: sine, 1: tri
+        Updater::Const(0), // phaserWaveform: 0: sine, 1: tri
         Updater::Sweep("phaserFeedback", -99, 99),
         Updater::Sweep("phaserManual", 5, 65),
-        Updater::Const("", 0),
-        Updater::Const("", 0),
-        Updater::Const("", 0),
-        Updater::Const("eff_modSource", 4), // 4, or 5 for the other effect
-        Updater::Const("eff_modAmount", 15), // 15
+        Updater::Const(0),
+        Updater::Const(0),
+        Updater::Const(0),
+        Updater::Const(4), // eff_modSource: 4, or 5 for the other effect
+        Updater::Const(15), // eff_modAmount: 15
     ]
 };
 
@@ -297,12 +296,12 @@ const FLANGER: Effect = Effect {
         Updater::Sweep("flangerDepth", 20, 99),
         Updater::Sweep("flangerSpeed", 20, 99),
         Updater::Sweep("flangerResonance", -99, 99),
-        Updater::Const("", 0),
-        Updater::Const("", 0),
+        Updater::Const(0),
+        Updater::Const(0),
         Updater::Sweep("flangerEqLow", -12, 12),
         Updater::Sweep("flangerEqHigh", -12, 12),
-        Updater::Const("eff_modSource", 4), // 4, or 5 for the other effect
-        Updater::Const("eff_modAmount", 15), // 15
+        Updater::Const(4), // eff_modSource: 4, or 5 for the other effect
+        Updater::Const(15), // eff_modAmount: 15
     ]
 };
 
@@ -312,14 +311,14 @@ const CHORUS: Effect = Effect {
     updater: [
         Updater::Sweep("chorusDepth", 50, 99),
         Updater::Sweep("chorusSpeed", 20, 99),
-        Updater::Const("chorusWaveform", 0),
+        Updater::Const(0),  // chorusWaveform
         Updater::Sweep("chorusDelay", 1, 127), // should be 200
-        Updater::Const("", 0),
-        Updater::Const("", 0),
+        Updater::Const(0),
+        Updater::Const(0),
         Updater::Sweep("chorusEqLow", -12, 12),
         Updater::Sweep("chorusEqHigh", -12, 12),
-        Updater::Const("eff_modSource", 4), // 4, or 5 for the other effect
-        Updater::Const("eff_modAmount", 15), // 15
+        Updater::Const(4), // eff_modSource: 4, or 5 for the other effect
+        Updater::Const(15), // eff_modAmount: 15
     ]
 };
 
@@ -335,9 +334,9 @@ const HARMONIC_CHORUS: Effect = Effect {
         Updater::Sweep("harmonicChorusDepth", 50, 99),
         Updater::Sweep("harmonicChorusSpeed", 20, 99),
         Updater::Sweep("harmonicChorusFilterSplit", 0, 18),
-        Updater::Const("", 0),
-        Updater::Const("eff_modSource", 4), // 4, or 5 for the other effect
-        Updater::Const("eff_modAmount", 15), // 15
+        Updater::Const(0),
+        Updater::Const(4), // eff_modSource: 4, or 5 for the other effect
+        Updater::Const(15), // eff_modAmount: 1515
     ]
 };
 
@@ -348,14 +347,14 @@ const EXCITER: Effect = Effect {
     updater: [
         Updater::Sweep("exciterBlend", -99, 99),
         Updater::Sweep("exciterEmphaticPoint", 1, 10),
-        Updater::Const("", 0),
-        Updater::Const("", 0),
-        Updater::Const("", 0),
-        Updater::Const("", 0),
+        Updater::Const(0),
+        Updater::Const(0),
+        Updater::Const(0),
+        Updater::Const(0),
         Updater::Sweep("exciterEqLow", -12, 12),
         Updater::Sweep("exciterEqHigh", -12, 12),
-        Updater::Const("eff_modSource", 4), // 4, or 5 for the other effect
-        Updater::Const("eff_modAmount", 15), // 15
+        Updater::Const(4), // eff_modSource: 4, or 5 for the other effect
+        Updater::Const(15), // eff_modAmount: 15
     ]
 };
 
@@ -368,12 +367,12 @@ const ENHANCER: Effect = Effect {
         Updater::Sweep("enhancerHotSpot", 1, 99),
         Updater::Sweep("enhancerStereoWidth", 1, 99),
         Updater::Sweep("enhancerDelay", 1, 99),
-        Updater::Const("", 0),
-        Updater::Const("", 0),
+        Updater::Const(0),
+        Updater::Const(0),
         Updater::Sweep("enhancerEqLow", -12, 12),
         Updater::Sweep("enhancerEqHigh", -12, 12),
-        Updater::Const("eff_modSource", 4), // 4, or 5 for the other effect
-        Updater::Const("eff_modAmount", 15), // 15
+        Updater::Const(4), // eff_modSource: 4, or 5 for the other effect
+        Updater::Const(15), // eff_modAmount: 15
     ]
 };
 
@@ -383,15 +382,15 @@ const SYMPHONIC: Effect = Effect {
     mix: 50,
     updater: [
         Updater::Sweep("symphonicDepth", 20, 99),
-        Updater::Const("", 0),
-        Updater::Const("", 0),
-        Updater::Const("", 0),
-        Updater::Const("", 0),
-        Updater::Const("", 0),
+        Updater::Const(0),
+        Updater::Const(0),
+        Updater::Const(0),
+        Updater::Const(0),
+        Updater::Const(0),
         Updater::Sweep("symphonicEqLow", -12, 12),
         Updater::Sweep("symphonicEqHigh", -12, 12),
-        Updater::Const("eff_modSource", 4), // 4, or 5 for the other effect
-        Updater::Const("eff_modAmount", 15), // 15
+        Updater::Const(4), // eff_modSource: 4, or 5 for the other effect
+        Updater::Const(15), // eff_modAmount: 15
     ]
 };
 
@@ -422,16 +421,16 @@ impl <'a>KorgEffectSelector<'a> {
 
     pub fn pre_eff(&self) -> FxUpdater<'a> {
         [
-            Updater::Const("", 0),
-            Updater::Const("eff1_number", self.eff1.number),
-            Updater::Const("eff2_number", self.eff2.number),
-            Updater::Const("eff1_level_A", self.eff1.mix),
-            Updater::Const("eff1_level_B", self.eff1.mix),
-            Updater::Const("eff2_level_C", self.eff2.mix),
-            Updater::Const("eff2_level_D", self.eff2.mix),
-            Updater::Const("pan3", 101),
-            Updater::Const("pan4", 1),
-            Updater::Const("eff_routing", 0x10 | 0x0F) // routing | enable
+            Updater::Const(0),
+            Updater::Const(self.eff1.number),  // eff1_number
+            Updater::Const(self.eff2.number),  // eff2_number
+            Updater::Const(self.eff1.mix),  // eff1_level_A
+            Updater::Const(self.eff1.mix),  // eff1_level_B
+            Updater::Const(self.eff2.mix),  // eff2_level_C
+            Updater::Const(self.eff2.mix),  // eff2_level_D
+            Updater::Const(101),  // pan3
+            Updater::Const(1),  // pan4
+            Updater::Const(0x10 | 0x0F) // routing | enable
         ]
     }
 }
