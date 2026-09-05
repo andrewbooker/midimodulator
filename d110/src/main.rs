@@ -55,42 +55,26 @@ const NUM_D110_PARTS: usize = 6;
 
 
 
-fn send(d110_number: i32, number: u8) {
-    let mut d110_midi_out = MidiOut::using_device(d110_number);
-    let d110_init = init_d110();
-    d110_midi_out.send_sys_ex(&d110_init.to_send());
+fn send(d110_midi_out: &mut MidiOut, number: u8) {
     println!("sending timbre {}", number);
     d110_midi_out.send_sys_ex(&init_timbre(number).to_send());
+
+    let tone: &mut D110SysEx = &mut set_up_tone(number);
     println!("intitialising part {}", number);
-    d110_midi_out.send_sys_ex(&set_up_tone(number).to_send());
+    d110_midi_out.send_sys_ex(&tone.to_send());
     println!("D110 init sent");
 
     let count: u32 = 1;
     let interval = FixedEquivalentMillisInterval::new(1000 * count);
     let mut updater = PairedUpdater::new(&interval);
 
-    let tones: [& mut D110SysEx; NUM_D110_PARTS] = [
-        &mut set_up_tone(1),
-        &mut set_up_tone(2),
-        &mut set_up_tone(3),
-        &mut set_up_tone(4),
-        &mut set_up_tone(5),
-        &mut set_up_tone(6)
-    ];
-
     let prefixes = ["A_1", "B_3", "C_2", "D_4"];
-    for t in 0..NUM_D110_PARTS {
-        for p in prefixes {
-            updater.update(tones[t], &PARTIAL_SPEC, Some(&*format!("tone{}_partial{}", t + 1, p)));
-        }
+    for p in prefixes {
+        updater.update(tone, &PARTIAL_SPEC, Some(&*format!("tone{}_partial{}", number - 1, p)));
     }
 
     updater.sweep_alternator();
-
-    for t in 0..NUM_D110_PARTS {
-        let v = tones[t].to_send();
-        d110_midi_out.send_sys_ex(&v);
-    }
+    d110_midi_out.send_sys_ex(&tone.to_send());
 
     let note: u8 = 69;
     let channel = number - 1;
@@ -106,7 +90,12 @@ fn send(d110_number: i32, number: u8) {
 fn main() {
     let d110_number = MidiOutDevices::index_of("USB MIDI").unwrap();
     println!("D110 port {}", d110_number);
-    send(d110_number, 3);
+    
+    let mut d110_midi_out = MidiOut::using_device(d110_number);
+    let d110_init = init_d110();
+    d110_midi_out.send_sys_ex(&d110_init.to_send());
+    
+    send(&mut d110_midi_out, 3);
 
     let (cmd_stop_tx, cmd_stop_rx) = mpsc::channel();
 
