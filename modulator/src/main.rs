@@ -2,7 +2,6 @@ extern crate libc;
 
 mod korg;
 mod midi;
-mod d110;
 mod utils;
 mod modulation;
 
@@ -13,13 +12,7 @@ use crate::modulation::{
     SweepState,
     Selector
 };
-use crate::d110::{
-    init_d110,
-    init_timbre,
-    set_up_tone,
-    PARTIAL_SPEC,
-    D110SysEx
-};
+
 use crate::korg::{
     KorgProgramSysEx,
     KorgInitSysEx,
@@ -90,75 +83,6 @@ impl FixedEquivalentMillisInterval {
 impl StepInterval for FixedEquivalentMillisInterval {
     fn interval(&self) -> f32 {
         self.int as f32
-    }
-}
-
-const NUM_D110_PARTS: usize = 3;
-
-fn update_d110(updater: &mut PairedUpdater, d110_midi_out: &mut MidiOut) {
-    let mut dummy_1 = DummySelector::new();
-    let mut dummy_2 = DummySelector::new();
-
-    let tones: [& mut D110SysEx; NUM_D110_PARTS] = [
-        &mut set_up_tone(1),
-        &mut set_up_tone(2),
-        &mut set_up_tone(3)
-    ];
-
-    let prefixes = ["A_1", "B_3", "C_2", "D_4"];
-    for t in 0..NUM_D110_PARTS {
-        for p in prefixes {
-            updater.update(tones[t], &mut dummy_1, &mut dummy_2, &PARTIAL_SPEC, Some(&*format!("tone{}_partial{}", t + 1, p)));
-        }
-    }
-
-    updater.sweep_alternator();
-
-    for t in 0..NUM_D110_PARTS {
-        let v = tones[t].to_send();
-        d110_midi_out.send_sys_ex(&v);
-    }
-}
-
-
-fn receive_play_notifications(d110_number: i32) {
-    let mut d110_midi_out = MidiOut::using_device(d110_number);
-    let d110_init = init_d110();
-    d110_midi_out.send_sys_ex(&d110_init.to_send());
-    for t in 1..9 {
-        println!("sending timbre {}", t);
-        d110_midi_out.send_sys_ex(&init_timbre(t).to_send());
-    }
-    for t in 1..9 {
-        println!("intitialising part {}", t);
-        d110_midi_out.send_sys_ex(&set_up_tone(t).to_send());
-    }
-    println!("D110 init sent");
-
-    let listener = TcpListener::bind("0.0.0.0:7878").unwrap();
-    println!("tcp listener started on port 7878");
-
-    let mut count: u32 = 0;
-    for stream in listener.incoming() {
-        let mut stream = stream.unwrap();
-        let buf_reader = BufReader::new(&mut stream);
-        let http_request: Vec<_> = buf_reader
-            .lines()
-            .map(|result| result.unwrap())
-            .take_while(|line| !line.is_empty())
-            .collect();
-
-        count += 1;
-
-        let status_line = "HTTP/1.1 200 OK";
-        let contents = json::stringify(vec![0]);
-        let length = contents.len();
-        let response = format!("{status_line}\r\nContent-Type: application/json; charset=UTF-8\r\nContent-Length: {length}\r\n\r\n{contents}");
-        stream.write_all(response.as_bytes()).unwrap();
-
-        let interval = FixedEquivalentMillisInterval::new(1000 * count);
-        let mut updater = PairedUpdater::new(&interval);
-        update_d110(&mut updater, &mut d110_midi_out);
     }
 }
 
