@@ -107,7 +107,7 @@ pub fn init_timbre(number: u8) -> D110SysEx {
     sys_ex.data_u8(24); // keyShift in semitones, 24 = 0 shift, 27 = +3
     sys_ex.data_u8(50); // fineTune +/- 50, 50 = 0
     sys_ex.data_u8(12); // benderRange semitones, 0-24
-    sys_ex.data_u8(2); // note priority monoLast = 0, monoFirst, polyLast, polyFirst
+    sys_ex.data_u8(0); // note priority monoLast = 0, monoFirst, polyLast, polyFirst
     sys_ex.data_u8(if number < 7 { number + 1 } else { 0 }); // outputAssign 0=mix?
     sys_ex.data_u8(0); // dummy/reverb off
 
@@ -147,7 +147,7 @@ pub fn set_up_tone(number: u8) -> D110SysEx {
     //
     sys_ex.data_u8(0); // 0 = ss, 5 = pp
     sys_ex.data_u8(0); // 0 = ss, 5 = pp
-    sys_ex.data_u8(if number < 7 { 0xF } else { 0 }); // partial enable
+    sys_ex.data_u8(if number < 7 { 0xF } else { 0 }); // partial enable, 1-6 all four partials enabled
     sys_ex.data_u8(0); // envelope mode (0: normal, 1: no sustain?)
     sys_ex
 }
