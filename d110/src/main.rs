@@ -91,32 +91,7 @@ impl StepInterval for FixedEquivalentMillisInterval {
 
 
 
-const NUM_D110_PARTS: usize = 3;
-
-fn update_d110(updater: &mut PairedUpdater, d110_midi_out: &mut MidiOut) {
-    let mut dummy_1 = DummySelector::new();
-    let mut dummy_2 = DummySelector::new();
-
-    let tones: [& mut D110SysEx; NUM_D110_PARTS] = [
-        &mut set_up_tone(1),
-        &mut set_up_tone(2),
-        &mut set_up_tone(3)
-    ];
-
-    let prefixes = ["A_1", "B_3", "C_2", "D_4"];
-    for t in 0..NUM_D110_PARTS {
-        for p in prefixes {
-            updater.update(tones[t], &mut dummy_1, &mut dummy_2, &PARTIAL_SPEC, Some(&*format!("tone{}_partial{}", t + 1, p)));
-        }
-    }
-
-    updater.sweep_alternator();
-
-    for t in 0..NUM_D110_PARTS {
-        let v = tones[t].to_send();
-        d110_midi_out.send_sys_ex(&v);
-    }
-}
+const NUM_D110_PARTS: usize = 6;
 
 
 
@@ -133,7 +108,31 @@ fn send(d110_number: i32, number: u8) {
     let count: u32 = 1;
     let interval = FixedEquivalentMillisInterval::new(1000 * count);
     let mut updater = PairedUpdater::new(&interval);
-    update_d110(&mut updater, &mut d110_midi_out);
+    let mut dummy_1 = DummySelector::new();
+    let mut dummy_2 = DummySelector::new();
+
+    let tones: [& mut D110SysEx; NUM_D110_PARTS] = [
+        &mut set_up_tone(1),
+        &mut set_up_tone(2),
+        &mut set_up_tone(3),
+        &mut set_up_tone(4),
+        &mut set_up_tone(5),
+        &mut set_up_tone(6)
+    ];
+
+    let prefixes = ["A_1", "B_3", "C_2", "D_4"];
+    for t in 0..NUM_D110_PARTS {
+        for p in prefixes {
+            updater.update(tones[t], &mut dummy_1, &mut dummy_2, &PARTIAL_SPEC, Some(&*format!("tone{}_partial{}", t + 1, p)));
+        }
+    }
+
+    updater.sweep_alternator();
+
+    for t in 0..NUM_D110_PARTS {
+        let v = tones[t].to_send();
+        d110_midi_out.send_sys_ex(&v);
+    }
 
     let note: u8 = 69;
     let channel = number - 1;
