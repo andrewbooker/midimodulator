@@ -77,7 +77,7 @@ impl PairedUpdater<'_> {
         (min as f32 + ((max as f32 - min as f32) * 0.5 * (1.0 + (dt * 0.001 * ang_freq).cos()))).round() as i8
     }
 
-    pub fn new(interval: &dyn StepInterval) -> PairedUpdater {
+    pub fn new(interval: &dyn StepInterval) -> PairedUpdater<'_> {
         let mut p = PairedUpdater {
             sweep_state: HashMap::<String, SweepState>::new(),
             interval
