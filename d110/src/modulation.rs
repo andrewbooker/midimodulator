@@ -4,10 +4,8 @@ use std::collections::HashMap;
 
 pub enum Updater<'a> {
     Const(&'a str, i8),
-    PairedInverseConst(&'a str, i8),
     Sweep(&'a str, i8, i8),
-    PairedInverseSweep(&'a str),
-    SelectOnZero(&'a str)
+    PairedInverseSweep()
 }
 
 
@@ -107,10 +105,6 @@ impl PairedUpdater<'_> {
                 Updater::Const(_, c) => {
                     sys_ex.data(*c);
                 },
-                Updater::PairedInverseConst(_, c) => {
-                    let inverse = '2' == prefix.unwrap().chars().last().unwrap();
-                    sys_ex.data(if inverse { *c } else { 0 });
-                },
                 Updater::Sweep(key, min, max) => {
                     let s = if prefix.is_none() { String::from(*key) } else { [prefix.unwrap(), *key].join("_") };
 
@@ -119,7 +113,7 @@ impl PairedUpdater<'_> {
                     *state_val = SweepState::updated_from(&state_val, new_val);
                     sys_ex.data(new_val);
                 },
-                Updater::PairedInverseSweep(_) => {
+                Updater::PairedInverseSweep() => {
                     let idx = prefix.unwrap().chars().last().unwrap().to_digit(10).unwrap() as u8;
                     let inverse = (idx % 2) == 0;
                     let v = self.sweep_state.get(&PairedUpdater::ALTERNATOR.to_string()).unwrap();
@@ -128,27 +122,6 @@ impl PairedUpdater<'_> {
                     } else {
                         sys_ex.data(v.val);
                     }
-                },
-                Updater::SelectOnZero(key) => {
-                    let idx = key.chars().last().unwrap().to_digit(10).unwrap() as u8;
-                    let inverse = (idx % 2) == 0;
-
-                    let v = self.sweep_state.get(&PairedUpdater::ALTERNATOR.to_string()).unwrap();
-                    let test_v = if inverse { PairedUpdater::ALTERNATOR_MAX } else { 0 };
-
-                    if v.val == test_v && v.prev_val != test_v {
-                        if 1 == idx {
-                            osc_selector.next1();
-                            effect_selector.next1();
-                            println!("new eff1 {}", effect_selector.val(1));
-                        } else {
-                            osc_selector.next2();
-                            effect_selector.next2();
-                            println!("new eff2 {}", effect_selector.val(2));
-                        }
-                        println!("{} change {}", key, osc_selector.val(idx));
-                    }
-                    sys_ex.data_double_byte(osc_selector.val(idx) as i16);
                 }
             }
         }
