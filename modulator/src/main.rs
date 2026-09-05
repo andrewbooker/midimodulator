@@ -163,7 +163,7 @@ fn receive_play_notifications(d110_number: i32) {
 }
 
 
-fn modulate_korg<C>(cmd_dump_rx: &Receiver<C>, res_tx: &Sender<HashMap<std::string::String, SweepState>>, first_tx: &Sender<i32>) {
+fn modulate_korg<C>(cmd_dump_rx: &Receiver<C>, res_tx: &Sender<HashMap<std::string::String, SweepState>>, edit_tx: &Sender<i32>) {
     let mut port = serialport::new("/dev/ttyUSB0", 38400)
                     .timeout(Duration::from_millis(1000))
                     .open()
@@ -176,6 +176,8 @@ fn modulate_korg<C>(cmd_dump_rx: &Receiver<C>, res_tx: &Sender<HashMap<std::stri
 
     let today = utils::today();
     let mut first = true;
+    let mut osc1 = 0;
+    let mut osc2 = 0;
 
     loop {
         let mut kpsx = KorgProgramSysEx::new();
@@ -192,6 +194,12 @@ fn modulate_korg<C>(cmd_dump_rx: &Receiver<C>, res_tx: &Sender<HashMap<std::stri
         updater.update(&mut kpsx, &mut osc_selector, &mut effect_selector, eff1_updater, Some("eff1"));
         updater.update(&mut kpsx, &mut osc_selector, &mut effect_selector, eff2_updater, Some("eff2"));
         updater.sweep_alternator();
+        let send_edit = osc1 != osc_selector.val(0) || osc2 != osc_selector.val(1);
+        if send_edit {
+            edit_tx.send(1).unwrap();
+            osc1 = osc_selector.val(0);
+            osc2 = osc_selector.val(1);
+        }
 
         port.write(&kpsx.data).expect("Write failed!");
         thread::sleep(Duration::from_millis(100));
@@ -202,22 +210,21 @@ fn modulate_korg<C>(cmd_dump_rx: &Receiver<C>, res_tx: &Sender<HashMap<std::stri
             },
             _ => {}
         }
-        if first {
-            first_tx.send(0).unwrap();
+        if first || send_edit {
+            edit_tx.send(0).unwrap();
             first = false;
-            thread::sleep(Duration::from_millis(100));
         }
     }
 }
 
 
 fn main() {
-    let d110_number = MidiOutDevices::index_of("4i4o MIDI 4").unwrap();
-    let korg_number = MidiOutDevices::index_of("4i4o MIDI 3").unwrap();
-    println!("D110 port {}", d110_number);
+    //let d110_number = MidiOutDevices::index_of("4i4o MIDI 4").unwrap();
+    let korg_number = MidiOutDevices::index_of("USB Midi").unwrap();
+    //println!("D110 port {}", d110_number);
     println!("Korg port {}", korg_number);
 
-    thread::spawn(move || { receive_play_notifications(d110_number); });
+    //thread::spawn(move || { receive_play_notifications(d110_number); });
 
     let mut midi_out = MidiOut::using_device(korg_number);
     midi_out.send_sys_ex(&KorgInitSysEx::new(0x02).data); // select prog
@@ -227,17 +234,12 @@ fn main() {
     midi_out.send_sys_ex(&KorgInitSysEx::new(0x03).data); // edit prog
     midi_out.send_sys_ex(&KorgSingleParamSysEx::new(0, 1).data); // oscillator mode: Double, on UI, otherwise the screen value overrides th sysEx
 
-    let ports = serialport::available_ports().expect("No ports found!");
-    for p in ports {
-        println!("{} available", p.port_name);
-    }
-
     let (cmd_dump_tx, cmd_dump_rx) = mpsc::channel();
     let (cmd_stop_tx, cmd_stop_rx) = mpsc::channel();
     let (res_tx, res_rx) = mpsc::channel();
-    let (first_tx, first_korg_rx) = mpsc::channel();
+    let (edit_tx, edit_korg_rx) = mpsc::channel();
 
-    thread::spawn(move || { modulate_korg(&cmd_dump_rx, &res_tx, &first_tx); });
+    thread::spawn(move || { modulate_korg(&cmd_dump_rx, &res_tx, &edit_tx); });
 
     thread::spawn(move || {
         let g = getch::Getch::new();
@@ -268,15 +270,20 @@ fn main() {
                 println!("stopping...");
                 break;
             },
-            _ => thread::sleep(Duration::from_millis(50))
+            _ => {}
         }
-        match first_korg_rx.try_recv() {
+        match edit_korg_rx.try_recv() {
             Ok(0) => {
-                midi_out.send_sys_ex(&KorgInitSysEx::new(0x02).data); // select prog (deselect edit, otherwise the oscillators don't change
-                println!("first korg modulation sent");
+                //midi_out.send_sys_ex(&KorgInitSysEx::new(0x02).data); // select prog deselect edit
+                println!("edit off");
             },
-            _ => thread::sleep(Duration::from_millis(50))
+            Ok(1) => {
+                //midi_out.send_sys_ex(&KorgInitSysEx::new(0x03).data); // select prog edit
+                println!("edit on");
+            },
+            _ => {}
         }
+        thread::sleep(Duration::from_millis(100));
     }
     thread::sleep(Duration::from_millis(2000));
 }

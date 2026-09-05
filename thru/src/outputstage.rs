@@ -19,10 +19,32 @@ use std::thread;
 use std::time::Duration;
 
 
+pub struct KorgInitSysEx {
+    pub data: [u8; 8]
+}
+
+impl KorgInitSysEx {
+    pub fn new(mode: u8) -> KorgInitSysEx {
+        KorgInitSysEx {
+            data: [0xF0,
+                   0x42, // ID of Korg
+                   0x30 | 0, // format ID (3), channel
+                   0x36, // 05R/W ID
+                   0x4E, // mode change
+                   mode,
+                   0x00,
+                   0xF7]
+        }
+    }
+}
+
+
 pub fn send_all_note_off(midi_out: &RtMidiOut) {
+    midi_out.message(&KorgInitSysEx::new(0x03).data).unwrap();
     for c in 0..16 {
         midi_out.message(&[0xB0 | c, 0x7B, 0]).unwrap();
     }
+    midi_out.message(&KorgInitSysEx::new(0x02).data).unwrap();
 }
 
 
@@ -30,7 +52,6 @@ pub fn send_all_note_off(midi_out: &RtMidiOut) {
 
 pub struct OutputStage {
     pub midi_out: Arc<RtMidiOut>,
-    pub hold_length: u8,
     pub should_record: bool,
     pub channel_range: u8
 }
@@ -67,14 +88,14 @@ impl OutputStage {
 
 impl MidiNoteSink for OutputStage {
     fn receive(&self, n: &Note, stats: &mut NoteStats) {
-        if self.hold_length == 0 {
+        if stats.hold_length == 0 {
             self.note_on(&n, stats);
             thread::sleep(Duration::from_millis(40));
             self.note_off(n.note, self.channel(&stats));
             return;
         }
 
-        if self.hold_length == 1 {
+        if stats.hold_length == 1 {
             let l = stats.last();
             self.note_off(l.0, l.1);
             if n.note != l.0 {
@@ -87,7 +108,7 @@ impl MidiNoteSink for OutputStage {
             return;
         }
 
-        let prev = stats.look_back(self.hold_length);
+        let prev = stats.look_back(stats.hold_length);
         if prev.0 != 0 {
             self.note_off(prev.0, prev.1);
         }

@@ -19,14 +19,16 @@ pub type PlayedNote = (u8, u8, Instant);
 
 pub struct NoteStats {
     pub received: [PlayedNote; NOTE_HISTORY],
-    pub last_dropped: PlayedNote
+    pub last_dropped: PlayedNote,
+    pub hold_length: u8
 }
 
 impl NoteStats {
     pub fn new() -> Self {
         Self {
             received: [(0, 0, Instant::now()); NOTE_HISTORY],
-            last_dropped: (0, 0, Instant::now())
+            last_dropped: (0, 0, Instant::now()),
+            hold_length: 0
         }
     }
 
@@ -47,6 +49,14 @@ impl NoteStats {
 
     pub fn drop(&mut self, n: u8) {
         self.last_dropped = (n, self.last().1, Instant::now());
+    }
+
+    pub fn hold_on(&mut self) {
+        self.hold_length = 1;
+    }
+
+    pub fn hold_off(&mut self) {
+        self.hold_length = 0;
     }
 }
 
