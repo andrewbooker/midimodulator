@@ -6,7 +6,7 @@ pub enum Updater<'a> {
     Const(&'a str, i8),
     PairedInverseConst(&'a str, i8),
     Sweep(&'a str, i8, i8),
-    PairedInverseSweep(&'a str),
+    PairedInverseSweep(),
     SelectOnZero(&'a str)
 }
 
@@ -119,7 +119,7 @@ impl PairedUpdater<'_> {
                     *state_val = SweepState::updated_from(&state_val, new_val);
                     sys_ex.data(new_val);
                 },
-                Updater::PairedInverseSweep(_) => {
+                Updater::PairedInverseSweep() => {
                     let idx = prefix.unwrap().chars().last().unwrap().to_digit(10).unwrap() as u8;
                     let inverse = (idx % 2) == 0;
                     let v = self.sweep_state.get(&PairedUpdater::ALTERNATOR.to_string()).unwrap();

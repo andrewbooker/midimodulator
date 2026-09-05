@@ -98,15 +98,15 @@ pub const ENV_TIME_LOW: i8 = 1;
 pub const ENV_TIME_HIGH: i8 = 10;
 
 pub const PROGRAM_SPEC: [Updater; 28] = [
-    Updater::Const("oscillatorMode", 1),
-    Updater::Const("noteMode", 0),
+    Updater::Const("", 1), // oscillatorMode
+    Updater::Const("", 0), // noteMode
     Updater::SelectOnZero("osc1"),
-    Updater::Const("osc1Register", 0),
+    Updater::Const("", 0), // osc1Register
     Updater::SelectOnZero("osc2"),
-    Updater::Const("osc2Register", 0),
-    Updater::Const("octave", 0),
+    Updater::Const("", 0), // osc2Register
+    Updater::Const("", 0), // octave
     Updater::Sweep("detune", -17, 17),
-    Updater::Const("delay", 0),
+    Updater::Const("", 0), // delay
 
     Updater::Const("env_pitch_startLevel", 0),
     Updater::Sweep("env_pitch_attackTime", 1, 4),
@@ -157,7 +157,7 @@ pub const OSC_SPEC: [Updater; 47] = [
     Updater::Sweep("env_filter_sustainLevel", -30, 90),
     Updater::Sweep("env_filter_releaseTime", 30, 60),
     Updater::Sweep("env_filter_releaseLevel", -90, 90),
-    Updater::PairedInverseSweep("vol"),
+    Updater::PairedInverseSweep(), // vol
     Updater::Const("oscKeybTrackKey", 0),
     Updater::Const("amplKeybTrackKeyIntensity", 0),
     Updater::Const("amplVelocitySens", 11),
@@ -173,7 +173,7 @@ pub const OSC_SPEC: [Updater; 47] = [
     Updater::Const("freq_EgTimeKeybTrackSwitchPolarity", 0),
     Updater::Const("freq_EgTimeVelocitySwitchPolarity", 0),
     Updater::Const("ampl_EgTimeKeybTrackSwitchPolarity", 0),
-    Updater::Const("ampl_EgTimeVelocitySwitchPolarity", 0),
+    Updater::Const("", 0), //
     Updater::PairedInverseConst("cdSend", -103), // 0x99
     Updater::Sweep("filterQ", 20, 99),
     Updater::Const("colourVelocitySens", 56),
