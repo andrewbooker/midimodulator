@@ -3,7 +3,7 @@ use std::collections::HashMap;
 
 
 pub enum Updater<'a> {
-    Const(&'a str, i8),
+    Const(i8),
     Sweep(&'a str, i8, i8),
     PairedInverseSweep()
 }
@@ -102,7 +102,7 @@ impl PairedUpdater<'_> {
     {
         for u in updaters {
             match u {
-                Updater::Const(_, c) => {
+                Updater::Const(c) => {
                     sys_ex.data(*c);
                 },
                 Updater::Sweep(key, min, max) => {
