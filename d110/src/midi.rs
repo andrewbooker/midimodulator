@@ -53,10 +53,6 @@ pub struct MidiMessage {
 }
 
 impl MidiMessage {
-    pub fn program(p: u8, channel: u8) -> MidiMessage {
-        MidiMessage { status: 0xC0 | channel, data1: p, data2: 0, data3: 0 }
-    }
-
     pub fn note_on(channel: u8, note: u8, vel: u8) -> MidiMessage {
         MidiMessage { status: 0x90 | channel, data1: note, data2: vel, data3: 0 }
     }

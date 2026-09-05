@@ -11,8 +11,6 @@ pub enum Updater<'a> {
 
 pub trait SysExComposer {
     fn data(&mut self, d: i8);
-    fn data_double_byte(&mut self, d: i16);
-    fn name(&mut self, n: &str);
 }
 
 

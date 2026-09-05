@@ -17,42 +17,19 @@ use crate::d110::{
 
 
 use crate::modulation::{
-    SysExComposer,
     PairedUpdater,
     StepInterval,
-    SweepState
 };
 
 
 use crate::midi::{MidiMessage, MidiOut, MidiOutDevices};
 use std::{
     thread,
-    time::{Duration, Instant},
-    sync::{mpsc, mpsc::{Sender, Receiver}},
-    io::{prelude::*, BufReader},
-    net::TcpListener,
-    collections::HashMap
+    time::Duration,
+    sync::{mpsc, mpsc::{Sender, Receiver}}
 };
-use rand::prelude::SliceRandom;
 
 
-struct TimeBasedInterval {
-    start: Instant
-}
-
-impl TimeBasedInterval {
-    fn new() -> TimeBasedInterval {
-        TimeBasedInterval {
-            start: Instant::now()
-        }
-    }
-}
-
-impl StepInterval for TimeBasedInterval {
-    fn interval(&self) -> f32 {
-        self.start.elapsed().as_millis() as f32
-    }
-}
 
 struct FixedEquivalentMillisInterval {
     int: u32

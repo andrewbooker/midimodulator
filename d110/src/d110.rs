@@ -72,8 +72,6 @@ impl SysExComposer for D110SysEx {
     fn data(&mut self, d: i8) {
         self.data_u8(d as u8);
     }
-    fn data_double_byte(&mut self, _: i16) {}
-    fn name(&mut self, _: &str) {}
 }
 
 
