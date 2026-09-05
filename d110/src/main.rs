@@ -91,50 +91,6 @@ impl StepInterval for FixedEquivalentMillisInterval {
 
 
 
-
-fn receive_play_notifications(d110_number: i32) {
-    let mut d110_midi_out = MidiOut::using_device(d110_number);
-    let d110_init = init_d110();
-    d110_midi_out.send_sys_ex(&d110_init.to_send());
-    for t in 1..9 {
-        println!("sending timbre {}", t);
-        d110_midi_out.send_sys_ex(&init_timbre(t).to_send());
-    }
-    for t in 1..9 {
-        println!("intitialising part {}", t);
-        d110_midi_out.send_sys_ex(&set_up_tone(t).to_send());
-    }
-    println!("D110 init sent");
-
-    let listener = TcpListener::bind("0.0.0.0:7878").unwrap();
-    println!("tcp listener started on port 7878");
-
-    let mut count: u32 = 0;
-    for stream in listener.incoming() {
-        let mut stream = stream.unwrap();
-        let buf_reader = BufReader::new(&mut stream);
-        let http_request: Vec<_> = buf_reader
-            .lines()
-            .map(|result| result.unwrap())
-            .take_while(|line| !line.is_empty())
-            .collect();
-
-        count += 1;
-
-        let status_line = "HTTP/1.1 200 OK";
-        let contents = json::stringify(vec![0]);
-        let length = contents.len();
-        let response = format!("{status_line}\r\nContent-Type: application/json; charset=UTF-8\r\nContent-Length: {length}\r\n\r\n{contents}");
-        stream.write_all(response.as_bytes()).unwrap();
-
-        let interval = FixedEquivalentMillisInterval::new(1000 * count);
-        let mut updater = PairedUpdater::new(&interval);
-        update_d110(&mut updater, &mut d110_midi_out);
-    }
-}
-
-
-
 const NUM_D110_PARTS: usize = 3;
 
 fn update_d110(updater: &mut PairedUpdater, d110_midi_out: &mut MidiOut) {
@@ -163,6 +119,30 @@ fn update_d110(updater: &mut PairedUpdater, d110_midi_out: &mut MidiOut) {
 }
 
 
+
+fn start(d110_number: i32) {
+    let mut d110_midi_out = MidiOut::using_device(d110_number);
+    let d110_init = init_d110();
+    d110_midi_out.send_sys_ex(&d110_init.to_send());
+    for t in 1..9 {
+        println!("sending timbre {}", t);
+        d110_midi_out.send_sys_ex(&init_timbre(t).to_send());
+    }
+    for t in 1..9 {
+        println!("intitialising part {}", t);
+        d110_midi_out.send_sys_ex(&set_up_tone(t).to_send());
+    }
+    println!("D110 init sent");
+
+    let count: u32 = 1;
+    let interval = FixedEquivalentMillisInterval::new(1000 * count);
+    let mut updater = PairedUpdater::new(&interval);
+    update_d110(&mut updater, &mut d110_midi_out);
+}
+
+
 fn main() {
-    println!("Hello, world!");
+    let d110_number = MidiOutDevices::index_of("USB MIDI").unwrap();
+    println!("D110 port {}", d110_number);
+    start(d110_number);
 }
