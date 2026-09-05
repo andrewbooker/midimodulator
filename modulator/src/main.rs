@@ -27,27 +27,10 @@ use std::{
     thread,
     time::{Duration, Instant},
     sync::{mpsc, mpsc::{Sender, Receiver}},
-    io::{prelude::*, BufReader},
-    net::TcpListener,
+    io::prelude::*,
     collections::HashMap
 };
-use rand::prelude::SliceRandom;
 
-
-struct DummySelector;
-
-impl DummySelector {
-    fn new() -> DummySelector {
-        DummySelector {}
-    }
-}
-
-impl Selector for DummySelector {
-    fn next1(&mut self) {}
-    fn next2(&mut self) {}
-
-    fn val(&self, _: u8) -> u16 { 0 }
-}
 
 
 struct TimeBasedInterval {
@@ -65,24 +48,6 @@ impl TimeBasedInterval {
 impl StepInterval for TimeBasedInterval {
     fn interval(&self) -> f32 {
         self.start.elapsed().as_millis() as f32
-    }
-}
-
-struct FixedEquivalentMillisInterval {
-    int: u32
-}
-
-impl FixedEquivalentMillisInterval {
-    fn new(int: u32) -> FixedEquivalentMillisInterval {
-        FixedEquivalentMillisInterval {
-            int
-        }
-    }
-}
-
-impl StepInterval for FixedEquivalentMillisInterval {
-    fn interval(&self) -> f32 {
-        self.int as f32
     }
 }
 

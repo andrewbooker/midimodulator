@@ -341,40 +341,6 @@ const HARMONIC_CHORUS: Effect = Effect {
     ]
 };
 
-const TREMOLO: Effect = Effect {
-    number: 36,
-    mix: 99,
-    updater: [
-        Updater::Sweep("tremoloDepth", 50, 99),
-        Updater::Sweep("tremoloSpeed", 64, 127), // should be 200 but only supporting i8 atm
-        Updater::Const("tremoloWaveform", 0), // 0: sine, 1: tri
-        Updater::Sweep("tremoloWaveShape", -99, 99),
-        Updater::Const("", 0),
-        Updater::Const("", 0),
-        Updater::Const("", 0),
-        Updater::Const("", 0),
-        Updater::Const("eff_modSource", 0), // don't bother with modulation as it only affects the balance
-        Updater::Const("eff_modAmount", 0)
-    ]
-};
-
-
-const DISTORTION: Effect = Effect {
-    number: 30,
-    mix: 50,
-    updater: [
-        Updater::Sweep("distDrive", 1, 88),
-        Updater::Sweep("distHotSpot", 2, 60),
-        Updater::Sweep("distResonance", 5, 77),
-        Updater::Const("distOut", 50),
-        Updater::Const("", 0),
-        Updater::Const("", 0),
-        Updater::Sweep("distEqLow", -12, 12),
-        Updater::Sweep("distEqHigh", -12, 12),
-        Updater::Const("eff_modSource", 4), // 4, or 5 for the other effect
-        Updater::Const("eff_modAmount", 15) // 15
-    ]
-};
 
 const EXCITER: Effect = Effect {
     number: 28,
