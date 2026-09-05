@@ -4,7 +4,7 @@ use std::collections::HashMap;
 
 pub enum Updater<'a> {
     Const(&'a str, i8),
-    PairedInverseConst(&'a str, i8),
+    PairedInverseConst(i8),
     Sweep(&'a str, i8, i8),
     PairedInverseSweep(),
     SelectOnZero(&'a str)
@@ -107,7 +107,7 @@ impl PairedUpdater<'_> {
                 Updater::Const(_, c) => {
                     sys_ex.data(*c);
                 },
-                Updater::PairedInverseConst(_, c) => {
+                Updater::PairedInverseConst(c) => {
                     let inverse = '2' == prefix.unwrap().chars().last().unwrap();
                     sys_ex.data(if inverse { *c } else { 0 });
                 },

@@ -174,7 +174,7 @@ pub const OSC_SPEC: [Updater; 47] = [
     Updater::Const("freq_EgTimeVelocitySwitchPolarity", 0),
     Updater::Const("ampl_EgTimeKeybTrackSwitchPolarity", 0),
     Updater::Const("", 0), //
-    Updater::PairedInverseConst("cdSend", -103), // 0x99
+    Updater::PairedInverseConst(-103), // cdSend, 0x99  
     Updater::Sweep("filterQ", 20, 99),
     Updater::Const("colourVelocitySens", 56),
     Updater::Const("vdfVdaKeyboardTrackMode", 0),
