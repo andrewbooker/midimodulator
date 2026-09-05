@@ -120,18 +120,14 @@ fn update_d110(updater: &mut PairedUpdater, d110_midi_out: &mut MidiOut) {
 
 
 
-fn send(d110_number: i32) {
+fn send(d110_number: i32, number: u8) {
     let mut d110_midi_out = MidiOut::using_device(d110_number);
     let d110_init = init_d110();
     d110_midi_out.send_sys_ex(&d110_init.to_send());
-    for t in 1..9 {
-        println!("sending timbre {}", t);
-        d110_midi_out.send_sys_ex(&init_timbre(t).to_send());
-    }
-    for t in 1..9 {
-        println!("intitialising part {}", t);
-        d110_midi_out.send_sys_ex(&set_up_tone(t).to_send());
-    }
+    println!("sending timbre {}", number);
+    d110_midi_out.send_sys_ex(&init_timbre(number).to_send());
+    println!("intitialising part {}", number);
+    d110_midi_out.send_sys_ex(&set_up_tone(number).to_send());
     println!("D110 init sent");
 
     let count: u32 = 1;
@@ -140,10 +136,10 @@ fn send(d110_number: i32) {
     update_d110(&mut updater, &mut d110_midi_out);
 
     let note: u8 = 69;
-    let channel: u8 = 0;
+    let channel = number - 1;
     let on = MidiMessage::note_on(channel, note, 100);
     d110_midi_out.send(&on);
-    thread::sleep(Duration::from_millis(100));
+    thread::sleep(Duration::from_millis(6000));
     let off = MidiMessage::note_off(channel, note);
     d110_midi_out.send(&off);
 }
@@ -153,7 +149,7 @@ fn send(d110_number: i32) {
 fn main() {
     let d110_number = MidiOutDevices::index_of("USB MIDI").unwrap();
     println!("D110 port {}", d110_number);
-    send(d110_number);
+    send(d110_number, 3);
 
     let (cmd_stop_tx, cmd_stop_rx) = mpsc::channel();
 
